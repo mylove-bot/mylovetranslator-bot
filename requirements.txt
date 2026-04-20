@@ -1,0 +1,5 @@
+gunicorn
+requests
+langdetect
+flask
+python-telegram-bot==20.7
