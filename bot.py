@@ -12,16 +12,21 @@ app = Flask(__name__)
 session = requests.Session()
 
 
-# ⚡ ترجمة سريعة
-def multi_translate(text):
+# ⚡ ترجمة واحدة
+def translate(text, target):
     try:
-        en = GoogleTranslator(source="auto", target="en").translate(text)
-        tr = GoogleTranslator(source="auto", target="tr").translate(text)
-        ru = GoogleTranslator(source="auto", target="ru").translate(text)
-        return en, tr, ru
+        return GoogleTranslator(source="auto", target=target).translate(text)
     except Exception as e:
         print("Translate error:", e)
-        return text, text, text
+        return text
+
+
+# 🔍 تحديد اللغة
+def get_lang(text):
+    try:
+        return detect(text)
+    except:
+        return "en"
 
 
 @app.route("/webhook", methods=["POST"])
@@ -40,17 +45,51 @@ def webhook():
         if not text or not chat_id:
             return "ok", 200
 
-        # ⚡ ترجمة
-        en, tr, ru = multi_translate(text)
+        lang = get_lang(text)
 
-        reply = f"""🌍 Translation:
+        # 🇬🇧 English → TR + RU
+        if lang.startswith("en"):
+            tr = translate(text, "tr")
+            ru = translate(text, "ru")
+            reply = f"""🌍 Translation:
+
+🇹🇷 {tr}
+🇷🇺 {ru}
+"""
+
+        # 🇹🇷 Turkish → EN + RU
+        elif lang.startswith("tr"):
+            en = translate(text, "en")
+            ru = translate(text, "ru")
+            reply = f"""🌍 Translation:
+
+🇬🇧 {en}
+🇷🇺 {ru}
+"""
+
+        # 🇷🇺 Russian → EN + TR
+        elif lang.startswith("ru"):
+            en = translate(text, "en")
+            tr = translate(text, "tr")
+            reply = f"""🌍 Translation:
+
+🇬🇧 {en}
+🇹🇷 {tr}
+"""
+
+        # 🌍 fallback (أي لغة ثانية)
+        else:
+            en = translate(text, "en")
+            tr = translate(text, "tr")
+            ru = translate(text, "ru")
+            reply = f"""🌍 Translation:
 
 🇬🇧 {en}
 🇹🇷 {tr}
 🇷🇺 {ru}
 """
 
-        # 💬 Reply على نفس الرسالة
+        # 💬 reply على نفس الرسالة
         requests.get(
             f"{URL}/sendMessage",
             params={
