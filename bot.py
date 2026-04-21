@@ -1,6 +1,6 @@
 import os
 import requests
-from langdetect import detect
+import re
 from flask import Flask, request
 from deep_translator import GoogleTranslator
 
@@ -12,21 +12,34 @@ app = Flask(__name__)
 session = requests.Session()
 
 
-# ⚡ ترجمة واحدة
+# 🔍 تحديد اللغة بشكل ذكي
+def get_lang(text):
+    try:
+        # عربي
+        if re.search(r'[\u0600-\u06FF]', text):
+            return "ar"
+
+        # روسي
+        if re.search(r'[\u0400-\u04FF]', text):
+            return "ru"
+
+        # إنجليزي / لاتيني
+        if re.search(r'[a-zA-Z]', text):
+            return "en"
+
+        return "en"
+
+    except:
+        return "en"
+
+
+# ⚡ ترجمة
 def translate(text, target):
     try:
         return GoogleTranslator(source="auto", target=target).translate(text)
     except Exception as e:
         print("Translate error:", e)
         return text
-
-
-# 🔍 تحديد اللغة
-def get_lang(text):
-    try:
-        return detect(text)
-    except:
-        return "en"
 
 
 @app.route("/webhook", methods=["POST"])
@@ -48,46 +61,34 @@ def webhook():
         lang = get_lang(text)
 
         # 🇬🇧 English → TR + RU
-        if lang.startswith("en"):
+        if lang == "en":
             tr = translate(text, "tr")
             ru = translate(text, "ru")
-            reply = f"""🌍 Translation:
-
-🇹🇷 {tr}
-🇷🇺 {ru}
-"""
+            reply = f"""🇹🇷 {tr}
+🇷🇺 {ru}"""
 
         # 🇹🇷 Turkish → EN + RU
-        elif lang.startswith("tr"):
+        elif lang == "tr":
             en = translate(text, "en")
             ru = translate(text, "ru")
-            reply = f"""🌍 Translation:
-
-🇬🇧 {en}
-🇷🇺 {ru}
-"""
+            reply = f"""🇬🇧 {en}
+🇷🇺 {ru}"""
 
         # 🇷🇺 Russian → EN + TR
-        elif lang.startswith("ru"):
+        elif lang == "ru":
             en = translate(text, "en")
             tr = translate(text, "tr")
-            reply = f"""🌍 Translation:
+            reply = f"""🇬🇧 {en}
+🇹🇷 {tr}"""
 
-🇬🇧 {en}
-🇹🇷 {tr}
-"""
-
-        # 🌍 fallback (أي لغة ثانية)
+        # 🌍 fallback
         else:
             en = translate(text, "en")
             tr = translate(text, "tr")
             ru = translate(text, "ru")
-            reply = f"""🌍 Translation:
-
-🇬🇧 {en}
+            reply = f"""🇬🇧 {en}
 🇹🇷 {tr}
-🇷🇺 {ru}
-"""
+🇷🇺 {ru}"""
 
         # 💬 reply على نفس الرسالة
         requests.get(
