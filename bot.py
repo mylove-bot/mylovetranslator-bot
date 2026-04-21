@@ -11,7 +11,7 @@ app = Flask(__name__)
 session = requests.Session()
 
 
-# 🔥 الترجمة (محسّنة)
+# 🔥 الترجمة (إجبارية)
 def translate(text, source, target):
     try:
         url = "https://libretranslate.com/translate"
@@ -26,11 +26,17 @@ def translate(text, source, target):
         r = session.post(url, json=payload, timeout=10)
         data = r.json()
 
-        return data.get("translatedText", text)
+        translated = data.get("translatedText")
+
+        # إذا ما في ترجمة حقيقية
+        if not translated:
+            return "⚠️ translation failed"
+
+        return translated
 
     except Exception as e:
         print("Translate error:", e)
-        return text
+        return "⚠️ translation failed"
 
 
 # 🔥 كشف اللغة
@@ -59,32 +65,32 @@ def webhook():
 
         lang = get_lang(text)
 
-        # 🇬🇧 EN
+        # 🇬🇧 English
         if lang.startswith("en"):
             tr = translate(text, "en", "tr")
             ru = translate(text, "en", "ru")
             reply = f"🇹🇷 {tr}\n🇷🇺 {ru}"
 
-        # 🇹🇷 TR
+        # 🇹🇷 Turkish
         elif lang.startswith("tr"):
             en = translate(text, "tr", "en")
             ru = translate(text, "tr", "ru")
             reply = f"🇬🇧 {en}\n🇷🇺 {ru}"
 
-        # 🇷🇺 RU
+        # 🇷🇺 Russian
         elif lang.startswith("ru"):
             en = translate(text, "ru", "en")
             tr = translate(text, "ru", "tr")
             reply = f"🇬🇧 {en}\n🇹🇷 {tr}"
 
-        # 🌍 أي لغة ثانية
+        # 🌍 any other language
         else:
             en = translate(text, "auto", "en")
             tr = translate(text, "auto", "tr")
             ru = translate(text, "auto", "ru")
             reply = f"🇬🇧 {en}\n🇹🇷 {tr}\n🇷🇺 {ru}"
 
-        # 🔥 إرسال الرسالة (Telegram API مباشر)
+        # 🔥 send message
         requests.get(
             f"{URL}/sendMessage",
             params={
@@ -99,7 +105,7 @@ def webhook():
     return "ok", 200
 
 
-# 🔥 صفحة تشغيل
+# 🔥 home route
 @app.route("/")
 def home():
     return "Bot is running", 200
