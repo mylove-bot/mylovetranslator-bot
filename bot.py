@@ -2,6 +2,7 @@ import os
 import requests
 from langdetect import detect
 from flask import Flask, request
+from deep_translator import GoogleTranslator
 
 TOKEN = os.getenv("TOKEN")
 URL = f"https://api.telegram.org/bot{TOKEN}"
@@ -11,39 +12,21 @@ app = Flask(__name__)
 session = requests.Session()
 
 
-# 🔥 الترجمة (إجبارية)
+# 🔥 ترجمة احترافية (Google)
 def translate(text, source, target):
     try:
-        url = "https://libretranslate.com/translate"
-
-        payload = {
-            "q": text,
-            "source": source,
-            "target": target,
-            "format": "text"
-        }
-
-        r = session.post(url, json=payload, timeout=10)
-        data = r.json()
-
-        translated = data.get("translatedText")
-
-        # إذا ما في ترجمة حقيقية
-        if not translated:
-            return "⚠️ translation failed"
-
+        translated = GoogleTranslator(source=source, target=target).translate(text)
         return translated
-
     except Exception as e:
         print("Translate error:", e)
-        return "⚠️ translation failed"
+        return "⚠️ translation error"
 
 
 # 🔥 كشف اللغة
 def get_lang(text):
     try:
         return detect(text)
-    except Exception:
+    except:
         return "en"
 
 
@@ -83,14 +66,14 @@ def webhook():
             tr = translate(text, "ru", "tr")
             reply = f"🇬🇧 {en}\n🇹🇷 {tr}"
 
-        # 🌍 any other language
+        # 🌍 أي لغة ثانية
         else:
             en = translate(text, "auto", "en")
             tr = translate(text, "auto", "tr")
             ru = translate(text, "auto", "ru")
             reply = f"🇬🇧 {en}\n🇹🇷 {tr}\n🇷🇺 {ru}"
 
-        # 🔥 send message
+        # 🔥 إرسال الرسالة
         requests.get(
             f"{URL}/sendMessage",
             params={
@@ -105,7 +88,6 @@ def webhook():
     return "ok", 200
 
 
-# 🔥 home route
 @app.route("/")
 def home():
     return "Bot is running", 200
