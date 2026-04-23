@@ -1,42 +1,35 @@
 import requests
 import re
 from flask import Flask, request
-from langdetect import detect, DetectorFactory
+from langdetect import detect
 from deep_translator import GoogleTranslator
 
 app = Flask(__name__)
 
-# 🔴 التوكن
+# 🔴 حط التوكن الجديد هنا
 TOKEN = "8170971907:AAE5CjJoTMyp6UGzP0hGjm0uKJpXDrBKgSs"
+
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
-DetectorFactory.seed = 0
 
-
-# 🔍 كشف اللغة (EN / TR / RU فقط)
+# 🔍 كشف اللغة
 def get_lang(text):
     try:
-        text = text.strip()
+        if re.search(r'[\u0600-\u06FF]', text):
+            return "ar"
 
-        # 🇷🇺 روسي
         if re.search(r'[\u0400-\u04FF]', text):
             return "ru"
 
-        # 🇹🇷 تركي
-        if re.search(r'[ğüşöçıİĞÜŞÖÇ]', text):
+        if re.search(r'[ğüşöçıİ]', text.lower()):
             return "tr"
 
-        # 🇬🇧 إنجليزي
-        if re.fullmatch(r'[A-Za-z0-9\s.,!?\'"()-]+', text):
-            return "en"
-
-        # 🧠 fallback
         lang = detect(text)
 
-        if lang.startswith("ru"):
-            return "ru"
         if lang.startswith("tr"):
             return "tr"
+        if lang.startswith("ru"):
+            return "ru"
 
         return "en"
 
@@ -44,11 +37,12 @@ def get_lang(text):
         return "en"
 
 
-# ⚡ ترجمة
+# ⚡ الترجمة
 def translate(text, target):
     try:
         return GoogleTranslator(source="auto", target=target).translate(text)
-    except:
+    except Exception as e:
+        print("Translate error:", e)
         return text
 
 
@@ -64,35 +58,42 @@ def webhook():
 
     text = message.get("text")
     chat_id = message.get("chat", {}).get("id")
+    message_id = message.get("message_id")
 
     if not text or not chat_id:
         return "ok", 200
 
     lang = get_lang(text)
 
-    # 🧠 الترجمة الفورية (بدون أي رسالة وسيطة)
+    # 🌍 الترجمة
     if lang == "en":
-        reply = f"🇹🇷 {translate(text,'tr')}\n🇷🇺 {translate(text,'ru')}"
+        tr = translate(text, "tr")
+        ru = translate(text, "ru")
+        reply = f"🇹🇷 {tr}\n🇷🇺 {ru}"
 
     elif lang == "tr":
-        reply = f"🇬🇧 {translate(text,'en')}\n🇷🇺 {translate(text,'ru')}"
+        en = translate(text, "en")
+        ru = translate(text, "ru")
+        reply = f"🇬🇧 {en}\n🇷🇺 {ru}"
 
     elif lang == "ru":
-        reply = f"🇬🇧 {translate(text,'en')}\n🇹🇷 {translate(text,'tr')}"
+        en = translate(text, "en")
+        tr = translate(text, "tr")
+        reply = f"🇬🇧 {en}\n🇹🇷 {tr}"
 
     else:
-        reply = (
-            f"🇬🇧 {translate(text,'en')}\n"
-            f"🇹🇷 {translate(text,'tr')}\n"
-            f"🇷🇺 {translate(text,'ru')}"
-        )
+        en = translate(text, "en")
+        tr = translate(text, "tr")
+        ru = translate(text, "ru")
+        reply = f"🇬🇧 {en}\n🇹🇷 {tr}\n🇷🇺 {ru}"
 
-    # 📩 إرسال مباشر
+    # 🚀 إرسال + reply على نفس الرسالة
     requests.post(
         f"{URL}/sendMessage",
         data={
             "chat_id": chat_id,
-            "text": reply
+            "text": reply,
+            "reply_to_message_id": message_id
         }
     )
 
@@ -102,7 +103,7 @@ def webhook():
 # 🏠 اختبار السيرفر
 @app.route("/")
 def home():
-    return "Bot is running 🚀", 200
+    return "Bot is running", 200
 
 
 # 🚀 تشغيل
