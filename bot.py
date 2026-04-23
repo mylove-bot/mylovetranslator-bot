@@ -52,11 +52,19 @@ def translate(text, target):
         return text
 
 
-# 📩 إرسال رسالة
-def send_message(chat_id, text):
+# 📩 إرسال رسالة (مع reply اختياري)
+def send_message(chat_id, text, reply_to=None):
+    payload = {
+        "chat_id": chat_id,
+        "text": text
+    }
+
+    if reply_to:
+        payload["reply_to_message_id"] = reply_to
+
     res = requests.post(
         f"{URL}/sendMessage",
-        data={"chat_id": chat_id, "text": text},
+        data=payload,
         timeout=5
     )
     return res.json()
@@ -87,21 +95,22 @@ def webhook():
 
     text = message.get("text")
     chat_id = message.get("chat", {}).get("id")
+    message_id = message.get("message_id")
 
     if not text or not chat_id:
         return "ok", 200
 
     lang = get_lang(text)
 
-    # ⏳ رسالة أولية بسيطة
-    temp = send_message(chat_id, "⏳ Translating...")
+    # ⏳ رسالة أولية (مع reply)
+    temp = send_message(chat_id, "⏳ Translating...", message_id)
 
     try:
         temp_id = temp["result"]["message_id"]
     except:
         temp_id = None
 
-    # 🧠 الترجمة الفورية
+    # 🧠 الترجمة
     if lang == "en":
         reply = f"🇹🇷 {translate(text,'tr')}\n🇷🇺 {translate(text,'ru')}"
 
@@ -118,7 +127,7 @@ def webhook():
             f"🇷🇺 {translate(text,'ru')}"
         )
 
-    # ✨ تحديث فوري
+    # ✨ تعديل الرسالة إلى الترجمة
     if temp_id:
         edit_message(chat_id, temp_id, reply)
 
