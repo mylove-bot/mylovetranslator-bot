@@ -1,5 +1,4 @@
-flask
+Flask
 requests
-gunicorn
-langdetect
 deep-translator
+gunicorn
