@@ -4,27 +4,30 @@ from flask import Flask, request
 from deep_translator import GoogleTranslator
 from concurrent.futures import ThreadPoolExecutor
 
-# 🔥 Lingua
+# 🔥 Lingua + fallback
 from lingua import Language, LanguageDetectorBuilder
+from langdetect import detect
 
 app = Flask(__name__)
 
 TOKEN = "8170971907:AAE5CjJoTMyp6UGz9P0hGjm0uKJpXDrBKgSs"
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
-# 🔥 إعداد اللغات
+# 🔥 إعداد Lingua
 languages = [Language.ENGLISH, Language.TURKISH, Language.RUSSIAN, Language.ARABIC]
 detector = LanguageDetectorBuilder.from_languages(*languages).build()
 
-# ⚡ Thread pool للسرعة
+# ⚡ Threads
 executor = ThreadPoolExecutor(max_workers=3)
 
+# 🧠 Cache
+cache = {}
 
-# 🔍 كشف لغة (متعدد)
+
+# 🔍 كشف اللغة (Lingua + fallback)
 def detect_languages(text):
     langs_found = set()
 
-    # تقسيم النص
     words = text.split()
 
     for word in words:
@@ -43,17 +46,42 @@ def detect_languages(text):
         except:
             continue
 
+    # 🔥 fallback لو فشل
     if not langs_found:
-        langs_found.add("en")
+        try:
+            lang = detect(text)
+            if lang.startswith("tr"):
+                langs_found.add("tr")
+            elif lang.startswith("ru"):
+                langs_found.add("ru")
+            elif lang.startswith("ar"):
+                langs_found.add("ar")
+            else:
+                langs_found.add("en")
+        except:
+            langs_found.add("en")
 
     return list(langs_found)
 
 
-# ⚡ ترجمة (async)
+# ⚡ ترجمة مع cache
+def translate_cached(text, target):
+    key = f"{text}_{target}"
+
+    if key in cache:
+        return cache[key]
+
+    try:
+        result = GoogleTranslator(source="auto", target=target).translate(text)
+        cache[key] = result
+        return result
+    except:
+        return text
+
+
+# ⚡ async wrapper
 def translate_async(text, target):
-    return executor.submit(
-        lambda: GoogleTranslator(source="auto", target=target).translate(text)
-    )
+    return executor.submit(lambda: translate_cached(text, target))
 
 
 @app.route("/webhook", methods=["POST"])
@@ -75,31 +103,33 @@ def webhook():
     langs = detect_languages(text)
 
     futures = []
-    results = []
+    used_targets = set()
 
-    # 🎯 نحدد الترجمات المطلوبة
+    # 🎯 تحديد الترجمات بدون تكرار
     if "en" in langs:
-        futures.append(("🇹🇷", translate_async(text, "tr")))
-        futures.append(("🇷🇺", translate_async(text, "ru")))
+        used_targets.update(["tr", "ru"])
 
     if "tr" in langs:
-        futures.append(("🇬🇧", translate_async(text, "en")))
-        futures.append(("🇷🇺", translate_async(text, "ru")))
+        used_targets.update(["en", "ru"])
 
     if "ru" in langs:
-        futures.append(("🇬🇧", translate_async(text, "en")))
-        futures.append(("🇹🇷", translate_async(text, "tr")))
+        used_targets.update(["en", "tr"])
 
     if "ar" in langs:
-        futures.append(("🇬🇧", translate_async(text, "en")))
-        futures.append(("🇹🇷", translate_async(text, "tr")))
-        futures.append(("🇷🇺", translate_async(text, "ru")))
+        used_targets.update(["en", "tr", "ru"])
 
-    # ⏳ نجمع النتائج
-    for flag, future in futures:
+    # 🚀 تشغيل الترجمة
+    for target in used_targets:
+        futures.append((target, translate_async(text, target)))
+
+    # ⏳ جمع النتائج
+    results = []
+    flags = {"en": "🇬🇧", "tr": "🇹🇷", "ru": "🇷🇺"}
+
+    for target, future in futures:
         try:
             result = future.result()
-            results.append(f"{flag} {result}")
+            results.append(f"{flags.get(target, '')} {result}")
         except:
             pass
 
