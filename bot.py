@@ -10,7 +10,7 @@ from langdetect import detect
 
 app = Flask(__name__)
 
-TOKEN = "8170971907:AAE5CjJoTMyp6UGz9P0hGjm0uKJpXDrBKgSs"
+TOKEN = "8170971907:AAF5zZ6bDuwNbcL1zpanp0oIcRHfbDzzuSg"
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
 # 🔥 إعداد Lingua
