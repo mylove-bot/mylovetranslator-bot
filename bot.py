@@ -9,20 +9,24 @@ TOKEN = "8170971907:AAE5CjJoTMyp6UGzP0hGjm0uKJpXDrBKgSs"
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
 
-# 🌍 كشف اللغة (ثابت وأبسط)
-def detect_lang(text):
+# 🌐 ترجمة عامة (auto)
+def translate(text, target):
     try:
-        return GoogleTranslator(source="auto", target="en").detect(text)
-    except:
-        return "en"
-
-
-# 🌐 ترجمة واضحة بدون auto في الترجمة نفسها
-def translate(text, src, target):
-    try:
-        return GoogleTranslator(source=src, target=target).translate(text)
+        return GoogleTranslator(source="auto", target=target).translate(text)
     except:
         return text
+
+
+# 🔍 كشف لغة بسيط وثابت
+def detect_lang(text):
+    if any('\u0600' <= c <= '\u06FF' for c in text):
+        return "ar"
+    elif any('\u0400' <= c <= '\u04FF' for c in text):
+        return "ru"
+    elif any(c in "ğüşöçıİ" for c in text.lower()):
+        return "tr"
+    else:
+        return "en"
 
 
 # 💬 webhook
@@ -45,26 +49,22 @@ def webhook():
     # 🔍 كشف اللغة
     lang = detect_lang(text)
 
-    # 🌍 الترجمة حسب اللغة
-    if lang.startswith("en"):
-        tr = translate(text, "en", "tr")
-        ru = translate(text, "en", "ru")
+    # 🌍 الترجمات
+    en = translate(text, "en")
+    tr = translate(text, "tr")
+    ru = translate(text, "ru")
+
+    # 💬 الرد حسب اللغة
+    if lang == "en":
         reply = f"🇹🇷 {tr}\n🇷🇺 {ru}"
 
-    elif lang.startswith("tr"):
-        en = translate(text, "tr", "en")
-        ru = translate(text, "tr", "ru")
+    elif lang == "tr":
         reply = f"🇬🇧 {en}\n🇷🇺 {ru}"
 
-    elif lang.startswith("ru"):
-        en = translate(text, "ru", "en")
-        tr = translate(text, "ru", "tr")
+    elif lang == "ru":
         reply = f"🇬🇧 {en}\n🇹🇷 {tr}"
 
     else:
-        en = translate(text, "auto", "en")
-        tr = translate(text, "auto", "tr")
-        ru = translate(text, "auto", "ru")
         reply = f"🇬🇧 {en}\n🇹🇷 {tr}\n🇷🇺 {ru}"
 
     # 🚀 إرسال الرد
