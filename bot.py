@@ -1,5 +1,6 @@
 import requests
 from flask import Flask, request
+from deep_translator import GoogleTranslator, LibreTranslator
 
 app = Flask(__name__)
 
@@ -7,22 +8,33 @@ app = Flask(__name__)
 TOKEN = "8170971907:AAE5CjJoTMyp6UGzP0hGjm0uKJpXDrBKgSs"
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
-# 🌐 ترجمة باستخدام LibreTranslate
-def translate(text, target):
+# 🌐 كشف اللغة باستخدام LibreTranslate
+def detect_language(text):
     try:
         response = requests.post(
-            "https://libretranslate.de/translate",
-            data={
-                "q": text,
-                "source": "auto",
-                "target": target,
-                "format": "text"
-            }
+            "https://libretranslate.de/detect",
+            data={"q": text},
+            timeout=10
         )
-        return response.json()["translatedText"]
+        result = response.json()
+        if result and isinstance(result, list):
+            return result[0]["language"]
+        return "auto"
     except Exception as e:
-        return f"خطأ بالترجمة: {e}"
+        print("Language detection error:", e)
+        return "auto"
 
+# 🌐 الترجمة باستخدام deep-translator أولاً، ثم LibreTranslate كبديل
+def translate(text, target):
+    try:
+        return GoogleTranslator(source='auto', target=target).translate(text)
+    except Exception as e:
+        print("GoogleTranslator error:", e)
+        try:
+            return LibreTranslator(source='auto', target=target).translate(text)
+        except Exception as e2:
+            print("LibreTranslator error:", e2)
+            return f"خطأ بالترجمة: {e2}"
 
 # 💬 webhook
 @app.route("/webhook", methods=["POST"])
@@ -40,13 +52,28 @@ def webhook():
     if not text or not chat_id:
         return "ok", 200
 
-    # 🌍 الترجمات (دائمًا إنجليزي + روسي + تركي)
-    en = translate(text, "en")
-    ru = translate(text, "ru")
-    tr = translate(text, "tr")
+    # 🔍 كشف اللغة الأصلية
+    src_lang = detect_language(text)
+    print("Detected language:", src_lang)
+
+    # 🌍 الترجمة حسب اللغة الأصلية
+    translations = []
+    if src_lang == "en":
+        translations.append(("🇷🇺", translate(text, "ru")))
+        translations.append(("🇹🇷", translate(text, "tr")))
+    elif src_lang == "tr":
+        translations.append(("🇬🇧", translate(text, "en")))
+        translations.append(("🇷🇺", translate(text, "ru")))
+    elif src_lang == "ru":
+        translations.append(("🇬🇧", translate(text, "en")))
+        translations.append(("🇹🇷", translate(text, "tr")))
+    else:
+        translations.append(("🇬🇧", translate(text, "en")))
+        translations.append(("🇷🇺", translate(text, "ru")))
+        translations.append(("🇹🇷", translate(text, "tr")))
 
     # 💬 الرد
-    reply = f"🇬🇧 {en}\n🇷🇺 {ru}\n🇹🇷 {tr}"
+    reply = "\n".join([f"{flag} {txt}" for flag, txt in translations])
 
     # 🚀 إرسال الرد
     requests.post(
@@ -60,12 +87,10 @@ def webhook():
 
     return "ok", 200
 
-
 # 🏠 اختبار السيرفر
 @app.route("/")
 def home():
     return "Bot is running", 200
-
 
 # 🚀 تشغيل
 if __name__ == "__main__":
