@@ -56,7 +56,7 @@ def webhook():
     src_lang = detect_language(text)
     print("Detected language:", src_lang)
 
-    # 🌍 الترجمة حسب اللغة الأصلية
+    # 🌍 الترجمة حسب اللغة الأصلية (بدون تكرار نفس اللغة)
     translations = []
     if src_lang == "en":
         translations.append(("🇷🇺", translate(text, "ru")))
