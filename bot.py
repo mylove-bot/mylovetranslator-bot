@@ -34,76 +34,123 @@ LANGUAGE_ORDER = ["en", "ru", "tr"]
 # =========================================================
 
 ENGLISH_COMMON = {
-    "a", "an", "the", "i", "me", "my", "you", "your",
-    "he", "she", "it", "we", "us", "they", "them",
-    "is", "am", "are", "was", "were",
+    "a", "an", "the",
+    "i", "me", "my",
+    "you", "your",
+    "he", "she", "it",
+    "we", "us", "they", "them",
+
+    "is", "am", "are",
+    "was", "were",
     "be", "been", "being",
+
     "do", "does", "did",
     "have", "has", "had",
-    "can", "could", "will", "would",
-    "should", "shall", "may", "might", "must",
 
-    "and", "or", "but", "if", "then",
-    "because", "so", "for", "from", "with",
-    "without", "about", "to", "of", "in",
+    "can", "could",
+    "will", "would",
+    "should", "shall",
+    "may", "might", "must",
+
+    "and", "or", "but",
+    "if", "then",
+    "because", "so",
+    "for", "from", "with",
+    "without", "about",
+    "to", "of", "in",
     "on", "at", "by",
 
-    "what", "why", "who", "where", "when",
+    "what", "why", "who",
+    "where", "when",
     "how", "which",
 
-    "this", "that", "these", "those",
+    "this", "that",
+    "these", "those",
     "here", "there",
 
-    "hello", "hi", "hey", "bye",
-    "yes", "yeah", "no", "nope",
-    "okay", "ok", "good", "bad",
-    "great", "nice", "fine",
+    "hello", "hi", "hey",
+    "bye", "goodbye",
 
-    "please", "thanks", "thank", "sorry",
+    "yes", "yeah",
+    "no", "nope",
 
-    "still", "some", "any", "more", "less",
-    "very", "really", "just", "only",
-    "also", "again", "already",
+    "okay", "ok",
+    "good", "bad",
+    "great", "nice",
+    "fine",
 
-    "mistake", "mistakes", "problem", "problems",
+    "please",
+    "thanks", "thank",
+    "sorry",
+
+    "still", "some",
+    "any", "more", "less",
+    "very", "really",
+    "just", "only",
+    "also", "again",
+    "already",
+
+    "mistake", "mistakes",
+    "problem", "problems",
     "thing", "things",
 
-    "love", "like", "want", "need",
-    "know", "think", "feel",
-    "see", "look", "come", "go",
-    "wait", "stop", "start"
+    "love", "like",
+    "want", "need",
+    "know", "think",
+    "feel", "see",
+    "look", "come",
+    "go", "wait",
+    "stop", "start"
 }
 
 
 RUSSIAN_COMMON = {
-    "я", "ты", "он", "она", "оно", "мы", "вы", "они",
-    "мне", "тебе", "ему", "ей", "нам", "вам", "им",
+    "я", "ты", "он", "она", "оно",
+    "мы", "вы", "они",
+
+    "мне", "тебе", "ему", "ей",
+    "нам", "вам", "им",
+
     "мой", "моя", "мое", "мои",
     "твой", "твоя", "твое", "твои",
 
     "да", "нет",
     "привет", "пока",
 
-    "что", "кто", "где", "куда", "откуда",
-    "когда", "как", "почему", "зачем",
-    "какой", "какая", "какие",
+    "что", "кто",
+    "где", "куда", "откуда",
+    "когда", "как",
+    "почему", "зачем",
+    "какой", "какая",
+    "какие",
 
-    "это", "этот", "эта", "эти",
-    "тот", "та", "то", "те",
+    "это", "этот",
+    "эта", "эти",
+    "тот", "та",
+    "то", "те",
 
-    "есть", "был", "была", "были",
-    "будет", "буду", "быть",
+    "есть", "был",
+    "была", "были",
+    "будет", "буду",
+    "быть",
 
     "можно", "нельзя",
-    "нужно", "нужен", "надо",
+    "нужно", "нужен",
+    "надо",
+
     "хочу", "хочешь",
+    "хотеть",
 
     "не", "ни",
-    "и", "или", "но",
-    "если", "потому",
+    "и", "или",
+    "но", "если",
+    "потому",
 
     "здесь", "там",
-    "сейчас", "сегодня", "завтра", "вчера",
+    "сейчас",
+    "сегодня",
+    "завтра",
+    "вчера",
     "снова", "опять",
     "всегда", "никогда",
 
@@ -119,8 +166,11 @@ RUSSIAN_COMMON = {
 
 
 TURKISH_COMMON = {
-    "ben", "sen", "o", "biz", "siz", "onlar",
-    "bana", "sana", "beni", "seni",
+    "ben", "sen", "o",
+    "biz", "siz", "onlar",
+
+    "bana", "sana",
+    "beni", "seni",
     "benim", "senin",
 
     "bir", "bu", "şu",
@@ -128,40 +178,49 @@ TURKISH_COMMON = {
 
     "evet", "hayır",
     "merhaba", "selam",
-    "güle",
 
-    "ne", "neden", "niye", "niçin",
+    "ne", "neden",
+    "niye", "niçin",
     "kim", "kime", "kimi",
-    "nerede", "nereye", "nereden",
+    "nerede", "nereye",
+    "nereden",
     "nasıl", "hangi",
-    "zaman",
 
     "var", "yok",
     "değil",
-    "oldu", "oluyor", "olacak",
+    "oldu", "oluyor",
+    "olacak",
 
-    "ve", "veya", "ama",
-    "çünkü", "eğer",
-    "için", "ile", "gibi",
+    "ve", "veya",
+    "ama", "çünkü",
+    "eğer", "için",
+    "ile", "gibi",
 
     "burada", "orada",
-    "şimdi", "bugün", "yarın", "dün",
-    "yine", "asla", "her",
+    "şimdi", "bugün",
+    "yarın", "dün",
+    "yine", "asla",
 
-    "iyi", "kötü", "güzel",
+    "iyi", "kötü",
+    "güzel",
     "tamam", "peki",
 
-    "teşekkür", "teşekkürler",
+    "teşekkür",
+    "teşekkürler",
     "lütfen", "özür",
 
-    "seviyorum", "istiyorum",
-    "biliyorum", "düşünüyorum",
-    "gel", "git", "bekle", "dur"
+    "seviyorum",
+    "istiyorum",
+    "biliyorum",
+    "düşünüyorum",
+
+    "gel", "git",
+    "bekle", "dur"
 }
 
 
 # =========================================================
-# HELPERS
+# TEXT HELPERS
 # =========================================================
 
 def normalize(text):
@@ -169,7 +228,10 @@ def normalize(text):
 
 
 def words(text):
-    return re.findall(r"[A-Za-zÀ-ÿĞÜŞİÖÇğüşıöçА-Яа-яЁё]+", normalize(text))
+    return re.findall(
+        r"[A-Za-zÀ-ÿĞÜŞİÖÇğüşıöçА-Яа-яЁё]+",
+        normalize(text)
+    )
 
 
 # =========================================================
@@ -185,25 +247,23 @@ def detect_language(text):
         return None
 
     # -----------------------------------------------------
-    # 1. Russian Cyrillic detection
+    # Russian: Cyrillic characters
     # -----------------------------------------------------
 
-    cyrillic = re.findall(r"[А-Яа-яЁё]", text)
-
-    if cyrillic:
-        print("Cyrillic detected -> Russian")
+    if re.search(r"[А-Яа-яЁё]", text):
+        print("Cyrillic detected -> ru")
         return "ru"
 
     # -----------------------------------------------------
-    # 2. Turkish special characters
+    # Turkish: special Turkish characters
     # -----------------------------------------------------
 
     if re.search(r"[ğüşıöçĞÜŞİÖÇ]", text):
-        print("Turkish characters detected -> Turkish")
+        print("Turkish characters detected -> tr")
         return "tr"
 
     # -----------------------------------------------------
-    # 3. Count common words
+    # Common-word scoring
     # -----------------------------------------------------
 
     en_score = sum(
@@ -211,26 +271,22 @@ def detect_language(text):
         if word in ENGLISH_COMMON
     )
 
-    tr_score = sum(
-        1 for word in word_list
-        if word in TURKISH_COMMON
-    )
-
     ru_score = sum(
         1 for word in word_list
         if word in RUSSIAN_COMMON
     )
 
+    tr_score = sum(
+        1 for word in word_list
+        if word in TURKISH_COMMON
+    )
+
     print(
-        f"Common scores -> "
+        f"Common scores: "
         f"en={en_score}, "
         f"ru={ru_score}, "
         f"tr={tr_score}"
     )
-
-    # -----------------------------------------------------
-    # 4. Strong common-word result
-    # -----------------------------------------------------
 
     scores = {
         "en": en_score,
@@ -241,24 +297,25 @@ def detect_language(text):
     best_lang = max(scores, key=scores.get)
     best_score = scores[best_lang]
 
+    sorted_scores = sorted(
+        scores.values(),
+        reverse=True
+    )
+
+    # إذا كان هناك تطابق واضح
     if best_score > 0:
-        # إذا اللغة المتفوقة واضحة
-        sorted_scores = sorted(
-            scores.values(),
-            reverse=True
-        )
 
         if (
-            len(sorted_scores) == 1
+            len(sorted_scores) < 2
             or sorted_scores[0] > sorted_scores[1]
         ):
             print(
-                f"Common words -> {best_lang}"
+                f"Common words detected -> {best_lang}"
             )
             return best_lang
 
     # -----------------------------------------------------
-    # 5. langdetect as secondary detector
+    # langdetect as secondary method
     # -----------------------------------------------------
 
     try:
@@ -281,25 +338,13 @@ def detect_language(text):
         )
 
     # -----------------------------------------------------
-    # 6. Latin fallback
+    # Latin fallback
     # -----------------------------------------------------
-    #
-    # إذا النص مكتوب بأحرف لاتينية عادية ولا توجد
-    # علامات تركية واضحة، نعتبره English.
-    #
-    # هذا مهم جدًا للجمل القصيرة مثل:
-    # "still some mistakes"
-    # "why"
-    # "hello"
-    # "I don't know"
-    #
 
-    latin = re.findall(r"[A-Za-z]", text)
-
-    if latin:
+    if re.search(r"[A-Za-z]", text):
 
         print(
-            "Latin fallback -> English"
+            "Latin fallback -> en"
         )
 
         return "en"
@@ -311,56 +356,71 @@ def detect_language(text):
 # TRANSLATION
 # =========================================================
 
-def translate(text, target):
+def translate(text, source, target):
+
+    print(
+        f"Translating: {source} -> {target}"
+    )
+
+    # -----------------------------------------------------
+    # Google Translator
+    # -----------------------------------------------------
 
     try:
 
         result = GoogleTranslator(
-            source="auto",
+            source=source,
             target=target
         ).translate(text)
 
         print(
-            f"Google translation -> {target}:",
+            f"Google {source}->{target}:",
             repr(result)
         )
 
-        return result
+        if result:
+            return result
 
     except Exception as e:
 
         print(
-            f"GoogleTranslator error -> {target}:",
+            f"GoogleTranslator error "
+            f"{source}->{target}:",
             repr(e)
         )
 
-    # Fallback
+    # -----------------------------------------------------
+    # LibreTranslator fallback
+    # -----------------------------------------------------
+
     try:
 
         result = LibreTranslator(
-            source="auto",
+            source=source,
             target=target
         ).translate(text)
 
         print(
-            f"Libre translation -> {target}:",
+            f"Libre {source}->{target}:",
             repr(result)
         )
 
-        return result
+        if result:
+            return result
 
     except Exception as e:
 
         print(
-            f"LibreTranslator error -> {target}:",
+            f"LibreTranslator error "
+            f"{source}->{target}:",
             repr(e)
         )
 
-        return None
+    return None
 
 
 # =========================================================
-# SEND MESSAGE
+# SEND TELEGRAM MESSAGE
 # =========================================================
 
 def send_message(chat_id, text, message_id=None):
@@ -382,12 +442,12 @@ def send_message(chat_id, text, message_id=None):
         )
 
         print(
-            "Telegram status:",
+            "Telegram sendMessage status:",
             response.status_code
         )
 
         print(
-            "Telegram response:",
+            "Telegram sendMessage response:",
             response.text
         )
 
@@ -396,7 +456,7 @@ def send_message(chat_id, text, message_id=None):
     except Exception as e:
 
         print(
-            "Telegram request error:",
+            "Telegram sendMessage error:",
             repr(e)
         )
 
@@ -413,62 +473,66 @@ def process_text(text, chat_id, message_id):
         return
 
     print("========================================")
-    print("Incoming text:", repr(text))
+    print(
+        "Incoming text:",
+        repr(text)
+    )
 
-    src_lang = detect_language(text)
+    source_lang = detect_language(text)
 
     print(
         "Detected language:",
-        src_lang
+        source_lang
     )
 
-    if src_lang not in SUPPORTED_LANGS:
+    if source_lang not in SUPPORTED_LANGS:
 
         print(
-            "Could not determine supported language."
+            "Unsupported or unknown language:",
+            source_lang
         )
 
         print("========================================")
 
         return
 
-    # All other languages except source
-    targets = [
+    target_languages = [
         lang
         for lang in LANGUAGE_ORDER
-        if lang != src_lang
+        if lang != source_lang
     ]
 
     print(
-        "Translation targets:",
-        targets
+        "Target languages:",
+        target_languages
     )
 
-    results = []
+    translations = []
 
-    for target in targets:
+    for target in target_languages:
 
         translated = translate(
             text,
+            source_lang,
             target
         )
 
         if translated:
 
-            results.append(
+            translations.append(
                 f"{FLAGS[target]} {translated}"
             )
 
         else:
 
-            results.append(
+            translations.append(
                 f"{FLAGS[target]} Translation failed."
             )
 
-    if not results:
+    if not translations:
         return
 
-    reply = "\n".join(results)
+    reply = "\n".join(translations)
 
     print(
         "Final reply:",
@@ -476,9 +540,9 @@ def process_text(text, chat_id, message_id):
     )
 
     send_message(
-        chat_id,
-        reply,
-        message_id
+        chat_id=chat_id,
+        text=reply,
+        message_id=message_id
     )
 
     print("========================================")
@@ -504,28 +568,36 @@ def webhook():
 
         return "ok", 200
 
+    # -----------------------------------------------------
     # Normal message
+    # -----------------------------------------------------
+
     message = data.get("message")
 
+    # -----------------------------------------------------
     # Edited message
+    # -----------------------------------------------------
+
     if not message:
         message = data.get("edited_message")
 
     if not message:
         return "ok", 200
 
-    chat = message.get("chat", {})
+    chat = message.get(
+        "chat",
+        {}
+    )
 
     chat_id = chat.get("id")
-
     message_id = message.get("message_id")
 
     if not chat_id:
         return "ok", 200
 
-    # =====================================================
-    # NORMAL TEXT
-    # =====================================================
+    # -----------------------------------------------------
+    # Normal text
+    # -----------------------------------------------------
 
     text = message.get("text")
 
@@ -539,11 +611,15 @@ def webhook():
 
         return "ok", 200
 
-    # =====================================================
-    # PHOTO + CAPTION
-    # =====================================================
+    # -----------------------------------------------------
+    # Caption
+    # -----------------------------------------------------
 
     caption = message.get("caption")
+
+    # -----------------------------------------------------
+    # Photo + caption
+    # -----------------------------------------------------
 
     if message.get("photo") and caption:
 
@@ -551,8 +627,8 @@ def webhook():
             "Photo with caption detected."
         )
 
-        # فقط الـcaption
-        # الصورة لا يتم إرسالها
+        # نترجم الـcaption فقط
+        # ولا نرسل الصورة
         process_text(
             caption,
             chat_id,
@@ -561,9 +637,9 @@ def webhook():
 
         return "ok", 200
 
-    # =====================================================
-    # VIDEO + CAPTION
-    # =====================================================
+    # -----------------------------------------------------
+    # Video + caption
+    # -----------------------------------------------------
 
     if message.get("video") and caption:
 
@@ -579,9 +655,9 @@ def webhook():
 
         return "ok", 200
 
-    # =====================================================
-    # DOCUMENT + CAPTION
-    # =====================================================
+    # -----------------------------------------------------
+    # Document + caption
+    # -----------------------------------------------------
 
     if message.get("document") and caption:
 
@@ -597,6 +673,8 @@ def webhook():
 
         return "ok", 200
 
+    # Media without caption -> ignore
+
     return "ok", 200
 
 
@@ -606,7 +684,6 @@ def webhook():
 
 @app.route("/", methods=["GET"])
 def home():
-
     return "Bot is running", 200
 
 
