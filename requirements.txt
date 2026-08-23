@@ -2,5 +2,4 @@ gunicorn
 requests
 langdetect
 flask
-python-telegram-bot==20.7
-deep_translator
+googletrans==4.0.0-rc1
