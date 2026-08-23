@@ -1,9 +1,11 @@
 import os
 import re
 import requests
+
 from flask import Flask, request
-from deep_translator import GoogleTranslator
 from langdetect import detect, LangDetectException
+from googletrans import Translator
+
 
 app = Flask(__name__)
 
@@ -27,6 +29,13 @@ FLAGS = {
 }
 
 LANGUAGE_ORDER = ["en", "ru", "tr"]
+
+
+# =========================================================
+# TRANSLATOR
+# =========================================================
+
+translator = Translator()
 
 
 # =========================================================
@@ -102,15 +111,11 @@ ENGLISH_COMMON = {
     "go", "wait",
     "stop", "start",
 
-    # Short/common words
     "test",
     "testing",
     "welcome",
     "help",
-    "please",
-    "done",
-    "yes",
-    "no"
+    "done"
 }
 
 
@@ -156,7 +161,8 @@ RUSSIAN_COMMON = {
 
     "здесь", "там",
     "сейчас",
-    "сегодня", "завтра",
+    "сегодня",
+    "завтра",
     "вчера",
     "снова", "опять",
     "всегда", "никогда",
@@ -293,7 +299,7 @@ def detect_language(text):
         return "en"
 
     # -----------------------------------------------------
-    # Russian: Cyrillic characters
+    # Russian
     # -----------------------------------------------------
 
     if re.search(r"[А-Яа-яЁё]", text):
@@ -301,7 +307,7 @@ def detect_language(text):
         return "ru"
 
     # -----------------------------------------------------
-    # Turkish: special Turkish characters
+    # Turkish special characters
     # -----------------------------------------------------
 
     if re.search(r"[ğüşıöçĞÜŞİÖÇ]", text):
@@ -309,7 +315,7 @@ def detect_language(text):
         return "tr"
 
     # -----------------------------------------------------
-    # Common-word scoring
+    # Common word scoring
     # -----------------------------------------------------
 
     en_score = sum(
@@ -349,7 +355,7 @@ def detect_language(text):
     )
 
     # -----------------------------------------------------
-    # Clear common-word match
+    # Clear common-word result
     # -----------------------------------------------------
 
     if best_score > 0:
@@ -364,7 +370,7 @@ def detect_language(text):
             return best_lang
 
     # -----------------------------------------------------
-    # langdetect as secondary method
+    # langdetect
     # -----------------------------------------------------
 
     try:
@@ -411,102 +417,31 @@ def translate(text, source, target):
         f"Translating: {source} -> {target}"
     )
 
-    # -----------------------------------------------------
-    # Method 1: deep-translator GoogleTranslator
-    # -----------------------------------------------------
-
     try:
 
-        translator = GoogleTranslator(
-            source=source,
-            target=target
+        result = translator.translate(
+            text,
+            src=source,
+            dest=target
         )
 
-        result = translator.translate(text)
+        translated = result.text.strip()
 
         print(
-            f"Google {source}->{target}:",
-            repr(result)
+            f"GoogleTrans {source}->{target}:",
+            repr(translated)
         )
 
-        if result and result.strip():
-
-            return result.strip()
+        if translated:
+            return translated
 
     except Exception as e:
 
         print(
-            f"GoogleTranslator error "
+            f"GoogleTrans error "
             f"{source}->{target}:",
             repr(e)
         )
-
-    # -----------------------------------------------------
-    # Method 2: Direct Google Translate endpoint
-    # -----------------------------------------------------
-
-    try:
-
-        url = (
-            "https://translate.googleapis.com/"
-            "translate_a/single"
-        )
-
-        params = {
-            "client": "gtx",
-            "sl": source,
-            "tl": target,
-            "dt": "t",
-            "q": text
-        }
-
-        response = requests.get(
-            url,
-            params=params,
-            timeout=15
-        )
-
-        print(
-            f"Direct Google status "
-            f"{source}->{target}:",
-            response.status_code
-        )
-
-        if response.ok:
-
-            data = response.json()
-
-            result = ""
-
-            if data and data[0]:
-
-                for item in data[0]:
-
-                    if item and item[0]:
-
-                        result += item[0]
-
-            if result.strip():
-
-                print(
-                    f"Direct Google "
-                    f"{source}->{target}:",
-                    repr(result)
-                )
-
-                return result.strip()
-
-    except Exception as e:
-
-        print(
-            f"Direct Google error "
-            f"{source}->{target}:",
-            repr(e)
-        )
-
-    # -----------------------------------------------------
-    # Failed
-    # -----------------------------------------------------
 
     return None
 
