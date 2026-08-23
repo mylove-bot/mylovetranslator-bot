@@ -2,7 +2,7 @@ import os
 import re
 import requests
 from flask import Flask, request
-from deep_translator import GoogleTranslator, LibreTranslator
+from deep_translator import GoogleTranslator
 from langdetect import detect, LangDetectException
 
 app = Flask(__name__)
@@ -100,7 +100,17 @@ ENGLISH_COMMON = {
     "feel", "see",
     "look", "come",
     "go", "wait",
-    "stop", "start"
+    "stop", "start",
+
+    # Short/common words
+    "test",
+    "testing",
+    "welcome",
+    "help",
+    "please",
+    "done",
+    "yes",
+    "no"
 }
 
 
@@ -121,8 +131,7 @@ RUSSIAN_COMMON = {
     "где", "куда", "откуда",
     "когда", "как",
     "почему", "зачем",
-    "какой", "какая",
-    "какие",
+    "какой", "какая", "какие",
 
     "это", "этот",
     "эта", "эти",
@@ -142,14 +151,12 @@ RUSSIAN_COMMON = {
     "хотеть",
 
     "не", "ни",
-    "и", "или",
-    "но", "если",
-    "потому",
+    "и", "или", "но",
+    "если", "потому",
 
     "здесь", "там",
     "сейчас",
-    "сегодня",
-    "завтра",
+    "сегодня", "завтра",
     "вчера",
     "снова", "опять",
     "всегда", "никогда",
@@ -191,10 +198,9 @@ TURKISH_COMMON = {
     "oldu", "oluyor",
     "olacak",
 
-    "ve", "veya",
-    "ama", "çünkü",
-    "eğer", "için",
-    "ile", "gibi",
+    "ve", "veya", "ama",
+    "çünkü", "eğer",
+    "için", "ile", "gibi",
 
     "burada", "orada",
     "şimdi", "bugün",
@@ -245,6 +251,46 @@ def detect_language(text):
 
     if not word_list:
         return None
+
+    # -----------------------------------------------------
+    # Known short English words
+    # -----------------------------------------------------
+
+    SHORT_ENGLISH = {
+        "test",
+        "testing",
+        "hello",
+        "hi",
+        "hey",
+        "ok",
+        "okay",
+        "yes",
+        "yeah",
+        "no",
+        "nope",
+        "thanks",
+        "thank",
+        "sorry",
+        "bye",
+        "good",
+        "bad",
+        "great",
+        "nice",
+        "fine",
+        "love",
+        "help",
+        "stop",
+        "wait",
+        "go",
+        "come",
+        "start",
+        "done",
+        "welcome"
+    }
+
+    if text in SHORT_ENGLISH:
+        print("Known short English word -> en")
+        return "en"
 
     # -----------------------------------------------------
     # Russian: Cyrillic characters
@@ -302,7 +348,10 @@ def detect_language(text):
         reverse=True
     )
 
-    # إذا كان هناك تطابق واضح
+    # -----------------------------------------------------
+    # Clear common-word match
+    # -----------------------------------------------------
+
     if best_score > 0:
 
         if (
@@ -363,23 +412,26 @@ def translate(text, source, target):
     )
 
     # -----------------------------------------------------
-    # Google Translator
+    # Method 1: deep-translator GoogleTranslator
     # -----------------------------------------------------
 
     try:
 
-        result = GoogleTranslator(
+        translator = GoogleTranslator(
             source=source,
             target=target
-        ).translate(text)
+        )
+
+        result = translator.translate(text)
 
         print(
             f"Google {source}->{target}:",
             repr(result)
         )
 
-        if result:
-            return result
+        if result and result.strip():
+
+            return result.strip()
 
     except Exception as e:
 
@@ -390,31 +442,71 @@ def translate(text, source, target):
         )
 
     # -----------------------------------------------------
-    # LibreTranslator fallback
+    # Method 2: Direct Google Translate endpoint
     # -----------------------------------------------------
 
     try:
 
-        result = LibreTranslator(
-            source=source,
-            target=target
-        ).translate(text)
-
-        print(
-            f"Libre {source}->{target}:",
-            repr(result)
+        url = (
+            "https://translate.googleapis.com/"
+            "translate_a/single"
         )
 
-        if result:
-            return result
+        params = {
+            "client": "gtx",
+            "sl": source,
+            "tl": target,
+            "dt": "t",
+            "q": text
+        }
+
+        response = requests.get(
+            url,
+            params=params,
+            timeout=15
+        )
+
+        print(
+            f"Direct Google status "
+            f"{source}->{target}:",
+            response.status_code
+        )
+
+        if response.ok:
+
+            data = response.json()
+
+            result = ""
+
+            if data and data[0]:
+
+                for item in data[0]:
+
+                    if item and item[0]:
+
+                        result += item[0]
+
+            if result.strip():
+
+                print(
+                    f"Direct Google "
+                    f"{source}->{target}:",
+                    repr(result)
+                )
+
+                return result.strip()
 
     except Exception as e:
 
         print(
-            f"LibreTranslator error "
+            f"Direct Google error "
             f"{source}->{target}:",
             repr(e)
         )
+
+    # -----------------------------------------------------
+    # Failed
+    # -----------------------------------------------------
 
     return None
 
@@ -473,6 +565,7 @@ def process_text(text, chat_id, message_id):
         return
 
     print("========================================")
+
     print(
         "Incoming text:",
         repr(text)
@@ -590,7 +683,10 @@ def webhook():
     )
 
     chat_id = chat.get("id")
-    message_id = message.get("message_id")
+
+    message_id = message.get(
+        "message_id"
+    )
 
     if not chat_id:
         return "ok", 200
@@ -627,8 +723,6 @@ def webhook():
             "Photo with caption detected."
         )
 
-        # نترجم الـcaption فقط
-        # ولا نرسل الصورة
         process_text(
             caption,
             chat_id,
@@ -673,7 +767,9 @@ def webhook():
 
         return "ok", 200
 
+    # -----------------------------------------------------
     # Media without caption -> ignore
+    # -----------------------------------------------------
 
     return "ok", 200
 
@@ -684,6 +780,7 @@ def webhook():
 
 @app.route("/", methods=["GET"])
 def home():
+
     return "Bot is running", 200
 
 
