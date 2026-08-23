@@ -4,10 +4,10 @@ import requests
 
 from flask import Flask, request
 from langdetect import detect, LangDetectException
-from googletrans import Translator
 
 
 app = Flask(__name__)
+
 
 # =========================================================
 # CONFIG
@@ -29,13 +29,6 @@ FLAGS = {
 }
 
 LANGUAGE_ORDER = ["en", "ru", "tr"]
-
-
-# =========================================================
-# TRANSLATOR
-# =========================================================
-
-translator = Translator()
 
 
 # =========================================================
@@ -258,7 +251,7 @@ def detect_language(text):
         return None
 
     # -----------------------------------------------------
-    # Very short known English words
+    # Very short English words
     # -----------------------------------------------------
 
     SHORT_ENGLISH = {
@@ -353,10 +346,6 @@ def detect_language(text):
         reverse=True
     )
 
-    # -----------------------------------------------------
-    # Clear common-word match
-    # -----------------------------------------------------
-
     if best_score > 0:
 
         if (
@@ -418,26 +407,63 @@ def translate(text, source, target):
 
     try:
 
-        result = translator.translate(
-            text,
-            src=source,
-            dest=target
+        url = "https://api.mymemory.translated.net/get"
+
+        params = {
+            "q": text,
+            "langpair": f"{source}|{target}"
+        }
+
+        response = requests.get(
+            url,
+            params=params,
+            timeout=20
         )
 
-        translated = result.text.strip()
-
         print(
-            f"GoogleTrans {source}->{target}:",
-            repr(translated)
+            f"Translation HTTP status "
+            f"{source}->{target}:",
+            response.status_code
+        )
+
+        if response.status_code != 200:
+            print(
+                "Translation API HTTP error:",
+                response.text
+            )
+            return None
+
+        data = response.json()
+
+        response_data = data.get(
+            "responseData",
+            {}
+        )
+
+        translated = response_data.get(
+            "translatedText"
         )
 
         if translated:
+
+            translated = translated.strip()
+
+            print(
+                f"Translation {source}->{target}:",
+                repr(translated)
+            )
+
             return translated
+
+        print(
+            "Translation API returned no translation:",
+            data
+        )
 
     except Exception as e:
 
         print(
-            f"GoogleTrans error "
+            f"Translation error "
             f"{source}->{target}:",
             repr(e)
         )
@@ -700,10 +726,6 @@ def webhook():
         )
 
         return "ok", 200
-
-    # -----------------------------------------------------
-    # Media without caption -> ignore
-    # -----------------------------------------------------
 
     return "ok", 200
 
