@@ -161,8 +161,7 @@ RUSSIAN_COMMON = {
 
     "здесь", "там",
     "сейчас",
-    "сегодня",
-    "завтра",
+    "сегодня", "завтра",
     "вчера",
     "снова", "опять",
     "всегда", "никогда",
@@ -259,7 +258,7 @@ def detect_language(text):
         return None
 
     # -----------------------------------------------------
-    # Known short English words
+    # Very short known English words
     # -----------------------------------------------------
 
     SHORT_ENGLISH = {
@@ -355,7 +354,7 @@ def detect_language(text):
     )
 
     # -----------------------------------------------------
-    # Clear common-word result
+    # Clear common-word match
     # -----------------------------------------------------
 
     if best_score > 0:
