@@ -2,7 +2,6 @@ import os
 import re
 import requests
 from flask import Flask, request
-from deep_translator import GoogleTranslator, LibreTranslator
 from langdetect import detect, LangDetectException
 
 app = Flask(__name__)
@@ -61,8 +60,7 @@ ENGLISH_COMMON = {
     "on", "at", "by",
 
     "what", "why", "who",
-    "where", "when",
-    "how", "which",
+    "where", "when", "how", "which",
 
     "this", "that",
     "these", "those",
@@ -121,8 +119,7 @@ RUSSIAN_COMMON = {
     "где", "куда", "откуда",
     "когда", "как",
     "почему", "зачем",
-    "какой", "какая",
-    "какие",
+    "какой", "какая", "какие",
 
     "это", "этот",
     "эта", "эти",
@@ -142,8 +139,7 @@ RUSSIAN_COMMON = {
     "хотеть",
 
     "не", "ни",
-    "и", "или",
-    "но", "если",
+    "и", "или", "но", "если",
     "потому",
 
     "здесь", "там",
@@ -191,10 +187,9 @@ TURKISH_COMMON = {
     "oldu", "oluyor",
     "olacak",
 
-    "ve", "veya",
-    "ama", "çünkü",
-    "eğer", "için",
-    "ile", "gibi",
+    "ve", "veya", "ama",
+    "çünkü", "eğer",
+    "için", "ile", "gibi",
 
     "burada", "orada",
     "şimdi", "bugün",
@@ -362,56 +357,114 @@ def translate(text, source, target):
         f"Translating: {source} -> {target}"
     )
 
-    # -----------------------------------------------------
-    # Google Translator
-    # -----------------------------------------------------
+    # Google Translate HTTP endpoint
+    url = "https://translate.googleapis.com/translate_a/single"
+
+    params = {
+        "client": "gtx",
+        "sl": source,
+        "tl": target,
+        "dt": "t",
+        "ie": "UTF-8",
+        "oe": "UTF-8",
+        "q": text
+    }
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 "
+            "(Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 "
+            "(KHTML, like Gecko) "
+            "Chrome/139.0.0.0 Safari/537.36"
+        )
+    }
 
     try:
 
-        result = GoogleTranslator(
-            source=source,
-            target=target
-        ).translate(text)
+        response = requests.get(
+            url,
+            params=params,
+            headers=headers,
+            timeout=20
+        )
 
         print(
-            f"Google {source}->{target}:",
+            f"Google HTTP status "
+            f"{source}->{target}:",
+            response.status_code
+        )
+
+        if response.status_code != 200:
+
+            print(
+                "Google response:",
+                response.text[:500]
+            )
+
+            return None
+
+        data = response.json()
+
+        translated_parts = []
+
+        if data and isinstance(data[0], list):
+
+            for sentence in data[0]:
+
+                if (
+                    isinstance(sentence, list)
+                    and len(sentence) > 0
+                    and sentence[0]
+                ):
+                    translated_parts.append(
+                        sentence[0]
+                    )
+
+        result = "".join(
+            translated_parts
+        ).strip()
+
+        print(
+            f"Google HTTP {source}->{target}:",
             repr(result)
         )
 
         if result:
             return result
 
-    except Exception as e:
+        print(
+            f"Google returned empty translation "
+            f"{source}->{target}"
+        )
+
+    except requests.exceptions.Timeout:
 
         print(
-            f"GoogleTranslator error "
+            f"Google translation timeout "
+            f"{source}->{target}"
+        )
+
+    except requests.exceptions.RequestException as e:
+
+        print(
+            f"Google HTTP error "
             f"{source}->{target}:",
             repr(e)
         )
 
-    # -----------------------------------------------------
-    # LibreTranslator fallback
-    # -----------------------------------------------------
-
-    try:
-
-        result = LibreTranslator(
-            source=source,
-            target=target
-        ).translate(text)
+    except ValueError as e:
 
         print(
-            f"Libre {source}->{target}:",
-            repr(result)
+            f"Google JSON error "
+            f"{source}->{target}:",
+            repr(e)
         )
-
-        if result:
-            return result
 
     except Exception as e:
 
         print(
-            f"LibreTranslator error "
+            f"Google translation error "
             f"{source}->{target}:",
             repr(e)
         )
