@@ -2,4 +2,3 @@ gunicorn
 requests
 langdetect
 flask
-googletrans==4.0.2
