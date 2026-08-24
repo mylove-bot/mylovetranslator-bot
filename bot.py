@@ -42,18 +42,9 @@ app = Flask(__name__)
 # =========================================================
 
 LANGUAGES = {
-    "en": {
-        "flag": "🇬🇧",
-        "name": "English"
-    },
-    "ru": {
-        "flag": "🇷🇺",
-        "name": "Russian"
-    },
-    "tr": {
-        "flag": "🇹🇷",
-        "name": "Turkish"
-    }
+    "en": {"flag": "🇬🇧", "name": "English"},
+    "ru": {"flag": "🇷🇺", "name": "Russian"},
+    "tr": {"flag": "🇹🇷", "name": "Turkish"},
 }
 
 
@@ -74,7 +65,7 @@ ENGLISH_WORDS = {
     "maybe", "really", "very", "now", "today",
     "tomorrow", "come", "go", "going", "get",
     "got", "make", "made", "know", "don't",
-    "doesn't", "can't", "won't"
+    "doesn't", "can't", "won't", "morning", "night"
 }
 
 TURKISH_WORDS = {
@@ -85,28 +76,21 @@ TURKISH_WORDS = {
     "ama", "çünkü", "teşekkür", "merhaba", "selam",
     "benim", "senin", "oyun", "para", "istiyorum",
     "gerekiyor", "bunu", "bana", "sana", "şimdi",
-    "bugün", "yarın", "gel", "git", "neden",
-    "tamam", "iyi", "kötü", "aşk", "seviyorum"
+    "bugün", "yarın", "gel", "git", "tamam",
+    "iyi", "kötü", "aşk", "seviyorum"
 }
 
 CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
 
 
 def detect_language(text):
-    """
-    Detect English / Russian / Turkish.
-    """
-
     if not text or not text.strip():
         return None
 
-    # Remove URLs
     clean = re.sub(r"https?://\S+", " ", text)
 
-    # Cyrillic = Russian
-    cyrillic_count = len(CYRILLIC_RE.findall(clean))
-
-    if cyrillic_count > 0:
+    # Cyrillic -> Russian
+    if len(CYRILLIC_RE.findall(clean)) > 0:
         logging.info("Cyrillic detected -> ru")
         return "ru"
 
@@ -130,11 +114,7 @@ def detect_language(text):
         if word in TURKISH_WORDS
     )
 
-    # Turkish special letters
-    if any(
-        char in text
-        for char in "çğıöşüÇĞİÖŞÜ"
-    ):
+    if any(char in text for char in "çğıöşüÇĞİÖŞÜ"):
         tr_score += 2
 
     logging.info(
@@ -151,11 +131,11 @@ def detect_language(text):
         logging.info("Turkish detected -> tr")
         return "tr"
 
-    # Latin fallback
     latin_count = sum(
-        1 for char in clean
+        1
+        for char in clean
         if (
-            ("a" <= char.lower() <= "z")
+            "a" <= char.lower() <= "z"
             or char in "çğıöşüÇĞİÖŞÜ"
         )
     )
@@ -185,17 +165,11 @@ def get_target_languages(source):
 
 
 # =========================================================
-# TRANSLATION
+# METHOD 1
+# deep-translator
 # =========================================================
 
-def translate_text(text, source, target):
-    """
-    Translate using deep-translator.
-
-    We create a fresh translator for every request.
-    This avoids keeping unnecessary state in memory.
-    """
-
+def translate_deep(text, source, target):
     logging.info(
         "deep-translator: %s -> %s",
         source,
@@ -210,63 +184,168 @@ def translate_text(text, source, target):
 
         result = translator.translate(text)
 
-        if result:
+        if result and result.strip():
+            result = result.strip()
+
             logging.info(
-                "Translation result %s->%s: %r",
+                "deep-translator result %s->%s: %r",
                 source,
                 target,
                 result
             )
 
-            return result.strip()
-
-        logging.warning(
-            "Empty translation %s->%s",
-            source,
-            target
-        )
-
-        return None
+            return result
 
     except Exception as exc:
         logging.warning(
-            "deep-translator error %s->%s: %s",
+            "deep-translator error %s->%s: %r",
             source,
             target,
-            repr(exc)
+            exc
         )
-
-        return None
-
-
-def translate_with_retry(text, source, target, retries=2):
-    """
-    Try translation more than once.
-    """
-
-    for attempt in range(retries + 1):
-
-        result = translate_text(
-            text,
-            source,
-            target
-        )
-
-        if result:
-            return result
-
-        if attempt < retries:
-            logging.info(
-                "Retrying translation %s->%s (attempt %s/%s)",
-                source,
-                target,
-                attempt + 1,
-                retries
-            )
-
-            time.sleep(1.5)
 
     return None
+
+
+# =========================================================
+# METHOD 2
+# DIRECT GOOGLE TRANSLATE FALLBACK
+# =========================================================
+
+def translate_google_fallback(text, source, target):
+    """
+    Direct request to Google's translation endpoint.
+
+    This is only used when deep-translator fails.
+    No extra package or API key is required.
+    """
+
+    logging.info(
+        "Google fallback: %s -> %s",
+        source,
+        target
+    )
+
+    url = "https://translate.googleapis.com/translate_a/single"
+
+    params = {
+        "client": "gtx",
+        "sl": source,
+        "tl": target,
+        "dt": "t",
+        "q": text
+    }
+
+    try:
+        response = requests.get(
+            url,
+            params=params,
+            timeout=10,
+            headers={
+                "User-Agent": "Mozilla/5.0"
+            }
+        )
+
+        logging.info(
+            "Google fallback HTTP status: %s",
+            response.status_code
+        )
+
+        if response.status_code != 200:
+            return None
+
+        data = response.json()
+
+        if not data or not data[0]:
+            return None
+
+        translated_parts = []
+
+        for item in data[0]:
+            if item and len(item) > 0 and item[0]:
+                translated_parts.append(item[0])
+
+        result = "".join(translated_parts).strip()
+
+        if result:
+            logging.info(
+                "Google fallback result %s->%s: %r",
+                source,
+                target,
+                result
+            )
+
+            return result
+
+    except Exception as exc:
+        logging.warning(
+            "Google fallback error %s->%s: %r",
+            source,
+            target,
+            exc
+        )
+
+    return None
+
+
+# =========================================================
+# SMART TRANSLATION
+# =========================================================
+
+def translate_text(text, source, target):
+    """
+    Smart translation:
+
+    1. Try deep-translator.
+    2. If it fails, wait briefly.
+    3. Try deep-translator again.
+    4. If it still fails, use direct Google fallback.
+    """
+
+    # Attempt 1
+    result = translate_deep(
+        text,
+        source,
+        target
+    )
+
+    if result:
+        return result
+
+    # Attempt 2
+    logging.info(
+        "Retrying deep-translator %s->%s",
+        source,
+        target
+    )
+
+    time.sleep(0.8)
+
+    result = translate_deep(
+        text,
+        source,
+        target
+    )
+
+    if result:
+        return result
+
+    # Fallback
+    logging.info(
+        "deep-translator failed. Using Google fallback %s->%s",
+        source,
+        target
+    )
+
+    time.sleep(0.3)
+
+    result = translate_google_fallback(
+        text,
+        source,
+        target
+    )
+
+    return result
 
 
 # =========================================================
@@ -285,12 +364,9 @@ def send_message(
     }
 
     if reply_to_message_id:
-        payload["reply_to_message_id"] = (
-            reply_to_message_id
-        )
+        payload["reply_to_message_id"] = reply_to_message_id
 
     try:
-
         response = requests.post(
             f"{TELEGRAM_API}/sendMessage",
             json=payload,
@@ -310,7 +386,6 @@ def send_message(
         return response.ok
 
     except requests.RequestException as exc:
-
         logging.warning(
             "Telegram error: %s",
             exc
@@ -320,7 +395,7 @@ def send_message(
 
 
 # =========================================================
-# BUILD TRANSLATION REPLY
+# BUILD REPLY
 # =========================================================
 
 def build_reply(text, source):
@@ -344,11 +419,10 @@ def build_reply(text, source):
 
     for target in targets:
 
-        translated = translate_with_retry(
+        translated = translate_text(
             text,
             source,
-            target,
-            retries=2
+            target
         )
 
         flag = LANGUAGES[target]["flag"]
@@ -402,7 +476,6 @@ def webhook():
 
         text = message.get("text")
 
-        # Ignore photos/stickers/voice/etc.
         if not text:
             return "OK", 200
 
@@ -423,10 +496,7 @@ def webhook():
             text
         )
 
-        # -------------------------------------------------
         # Ignore commands
-        # -------------------------------------------------
-
         if text.startswith("/"):
             logging.info(
                 "Command ignored: %s",
@@ -435,10 +505,7 @@ def webhook():
 
             return "OK", 200
 
-        # -------------------------------------------------
         # Detect language
-        # -------------------------------------------------
-
         source = detect_language(text)
 
         logging.info(
@@ -461,10 +528,7 @@ def webhook():
 
             return "OK", 200
 
-        # -------------------------------------------------
         # Translate
-        # -------------------------------------------------
-
         reply = build_reply(
             text,
             source
@@ -478,10 +542,7 @@ def webhook():
             reply
         )
 
-        # -------------------------------------------------
         # Send
-        # -------------------------------------------------
-
         send_message(
             chat_id,
             reply,
@@ -500,7 +561,7 @@ def webhook():
         )
 
         # Always return 200 to Telegram
-        # to prevent repeated webhook delivery.
+        # to avoid repeated webhook delivery.
         return "OK", 200
 
 
