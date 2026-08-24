@@ -1,8 +1,8 @@
 import os
 import re
-import json
-import time
+
 import requests
+import argostranslate.translate
 
 from flask import Flask, request
 from langdetect import detect, LangDetectException
@@ -18,11 +18,22 @@ app = Flask(__name__)
 TOKEN = os.getenv("TOKEN")
 
 if not TOKEN:
-    raise RuntimeError("TOKEN environment variable is missing")
+    raise RuntimeError(
+        "TOKEN environment variable is missing"
+    )
 
-TELEGRAM_URL = f"https://api.telegram.org/bot{TOKEN}"
 
-SUPPORTED_LANGS = {"en", "ru", "tr"}
+TELEGRAM_URL = (
+    f"https://api.telegram.org/bot{TOKEN}"
+)
+
+
+SUPPORTED_LANGS = {
+    "en",
+    "ru",
+    "tr"
+}
+
 
 FLAGS = {
     "en": "🇬🇧",
@@ -30,23 +41,22 @@ FLAGS = {
     "tr": "🇹🇷"
 }
 
-LANGUAGE_ORDER = ["en", "ru", "tr"]
+
+LANGUAGE_ORDER = [
+    "en",
+    "ru",
+    "tr"
+]
 
 
 # =========================================================
-# SESSION
+# HTTP SESSION
 # =========================================================
 
 session = requests.Session()
 
 session.headers.update({
-    "User-Agent": (
-        "Mozilla/5.0 "
-        "(Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 "
-        "(KHTML, like Gecko) "
-        "Chrome/139.0 Safari/537.36"
-    )
+    "User-Agent": "TelegramTranslatorBot/1.0"
 })
 
 
@@ -271,12 +281,13 @@ def words(text):
 def detect_language(text):
 
     text = normalize(text)
+
     word_list = words(text)
 
     if not word_list:
         return None
 
-    SHORT_ENGLISH = {
+    short_english = {
         "test",
         "testing",
         "hello",
@@ -308,32 +319,41 @@ def detect_language(text):
         "welcome"
     }
 
-    if text in SHORT_ENGLISH:
+    if text in short_english:
         print("Known short English word -> en")
         return "en"
 
     # Russian
-    if re.search(r"[А-Яа-яЁё]", text):
+    if re.search(
+        r"[А-Яа-яЁё]",
+        text
+    ):
         print("Cyrillic detected -> ru")
         return "ru"
 
-    # Turkish
-    if re.search(r"[ğüşıöçĞÜŞİÖÇ]", text):
+    # Turkish-specific characters
+    if re.search(
+        r"[ğüşıöçĞÜŞİÖÇ]",
+        text
+    ):
         print("Turkish characters detected -> tr")
         return "tr"
 
     en_score = sum(
-        1 for word in word_list
+        1
+        for word in word_list
         if word in ENGLISH_COMMON
     )
 
     ru_score = sum(
-        1 for word in word_list
+        1
+        for word in word_list
         if word in RUSSIAN_COMMON
     )
 
     tr_score = sum(
-        1 for word in word_list
+        1
+        for word in word_list
         if word in TURKISH_COMMON
     )
 
@@ -350,7 +370,11 @@ def detect_language(text):
         "tr": tr_score
     }
 
-    best_lang = max(scores, key=scores.get)
+    best_lang = max(
+        scores,
+        key=scores.get
+    )
+
     best_score = scores[best_lang]
 
     sorted_scores = sorted(
@@ -365,8 +389,10 @@ def detect_language(text):
             or sorted_scores[0] > sorted_scores[1]
         ):
             print(
-                f"Common words detected -> {best_lang}"
+                f"Common words detected -> "
+                f"{best_lang}"
             )
+
             return best_lang
 
     try:
@@ -389,7 +415,10 @@ def detect_language(text):
         )
 
     # Latin text fallback
-    if re.search(r"[A-Za-z]", text):
+    if re.search(
+        r"[A-Za-z]",
+        text
+    ):
 
         print(
             "Latin fallback -> en"
@@ -401,106 +430,36 @@ def detect_language(text):
 
 
 # =========================================================
-# GOOGLE TRANSLATE GTX
+# ARGOS TRANSLATION
 # =========================================================
 
-def translate_google(text, source, target):
+def translate_local(
+    text,
+    source,
+    target
+):
 
     print(
-        f"Google GTX translation: "
+        f"Argos translation: "
         f"{source} -> {target}"
     )
 
-    url = "https://translate.googleapis.com/translate_a/single"
-
-    params = {
-        "client": "gtx",
-        "sl": source,
-        "tl": target,
-        "dt": "t",
-        "ie": "UTF-8",
-        "oe": "UTF-8",
-        "q": text
-    }
-
     try:
 
-        response = session.get(
-            url,
-            params=params,
-            timeout=20
+        translated = (
+            argostranslate.translate.translate(
+                text,
+                source,
+                target
+            )
         )
-
-        print(
-            f"Google HTTP status "
-            f"{source}->{target}:",
-            response.status_code
-        )
-
-        if response.status_code != 200:
-
-            print(
-                "Google HTTP error:",
-                response.text[:500]
-            )
-
-            return None
-
-        try:
-
-            data = response.json()
-
-        except json.JSONDecodeError as e:
-
-            print(
-                "Google returned invalid JSON:",
-                repr(e)
-            )
-
-            print(
-                "Response:",
-                response.text[:500]
-            )
-
-            return None
-
-        # Expected structure:
-        #
-        # [
-        #   [
-        #      ["translated", "original", ...]
-        #   ],
-        #   ...
-        # ]
-
-        if not data:
-            return None
-
-        translated_parts = []
-
-        first_part = data[0]
-
-        if isinstance(first_part, list):
-
-            for item in first_part:
-
-                if (
-                    isinstance(item, list)
-                    and len(item) > 0
-                    and isinstance(item[0], str)
-                ):
-                    translated_parts.append(
-                        item[0]
-                    )
-
-        translated = "".join(
-            translated_parts
-        ).strip()
 
         if translated:
 
+            translated = translated.strip()
+
             print(
-                f"Google translation "
+                f"Argos result "
                 f"{source}->{target}:",
                 repr(translated)
             )
@@ -508,61 +467,17 @@ def translate_google(text, source, target):
             return translated
 
         print(
-            "Google returned no translated text:",
-            data
-        )
-
-    except requests.RequestException as e:
-
-        print(
-            f"Google request error "
-            f"{source}->{target}:",
-            repr(e)
+            f"Argos returned empty result "
+            f"{source}->{target}"
         )
 
     except Exception as e:
 
         print(
-            f"Google translation error "
+            f"Argos translation error "
             f"{source}->{target}:",
             repr(e)
         )
-
-    return None
-
-
-# =========================================================
-# TRANSLATION WITH RETRY
-# =========================================================
-
-def translate(text, source, target):
-
-    # First attempt
-    result = translate_google(
-        text,
-        source,
-        target
-    )
-
-    if result:
-        return result
-
-    # Small retry
-    print(
-        f"Retrying Google translation "
-        f"{source}->{target}"
-    )
-
-    time.sleep(0.5)
-
-    result = translate_google(
-        text,
-        source,
-        target
-    )
-
-    if result:
-        return result
 
     return None
 
@@ -670,7 +585,7 @@ def process_text(
 
     for target in target_languages:
 
-        translated = translate(
+        translated = translate_local(
             text,
             source_lang,
             target
@@ -685,7 +600,8 @@ def process_text(
         else:
 
             translations.append(
-                f"{FLAGS[target]} Translation failed."
+                f"{FLAGS[target]} "
+                f"Translation failed."
             )
 
     reply = "\n".join(
@@ -731,6 +647,9 @@ def webhook():
             repr(e)
         )
 
+        return "ok", 200
+
+    if not data:
         return "ok", 200
 
     message = data.get(
@@ -785,7 +704,6 @@ def webhook():
     if not caption:
         return "ok", 200
 
-    # Photo
     if message.get("photo"):
 
         print(
@@ -800,7 +718,6 @@ def webhook():
 
         return "ok", 200
 
-    # Video
     if message.get("video"):
 
         print(
@@ -815,7 +732,6 @@ def webhook():
 
         return "ok", 200
 
-    # Document
     if message.get("document"):
 
         print(
