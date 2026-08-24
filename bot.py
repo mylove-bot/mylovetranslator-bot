@@ -1,11 +1,9 @@
 import os
 import re
-import asyncio
 import requests
 
 from flask import Flask, request
 from langdetect import detect, LangDetectException
-from googletrans import Translator
 
 
 app = Flask(__name__)
@@ -32,6 +30,24 @@ FLAGS = {
 }
 
 LANGUAGE_ORDER = ["en", "ru", "tr"]
+
+
+# =========================================================
+# LIBRETRANSLATE SERVERS
+# =========================================================
+#
+# We try several public LibreTranslate-compatible servers.
+# If one fails, the next one is tried automatically.
+#
+# You can add/remove servers later without changing the bot.
+#
+
+TRANSLATION_SERVERS = [
+    "https://libretranslate.de",
+    "https://translate.argosopentech.com",
+    "https://translate.api.skitzen.com",
+    "https://trans.zillyhuhn.com",
+]
 
 
 # =========================================================
@@ -111,7 +127,20 @@ ENGLISH_COMMON = {
     "testing",
     "welcome",
     "help",
-    "done"
+    "done",
+
+    "morning",
+    "night",
+    "day",
+    "today",
+    "tomorrow",
+    "yesterday",
+
+    "everything",
+    "something",
+    "nothing",
+    "someone",
+    "everyone"
 }
 
 
@@ -159,6 +188,7 @@ RUSSIAN_COMMON = {
     "сейчас",
     "сегодня", "завтра",
     "вчера",
+
     "снова", "опять",
     "всегда", "никогда",
 
@@ -169,7 +199,12 @@ RUSSIAN_COMMON = {
     "люблю", "нравится",
     "знаю", "думаю",
     "вижу", "смотри",
-    "иди", "жди", "стой"
+
+    "иди", "жди", "стой",
+
+    "утро",
+    "ночь",
+    "день"
 }
 
 
@@ -206,6 +241,7 @@ TURKISH_COMMON = {
     "burada", "orada",
     "şimdi", "bugün",
     "yarın", "dün",
+
     "yine", "asla",
 
     "iyi", "kötü",
@@ -222,7 +258,11 @@ TURKISH_COMMON = {
     "düşünüyorum",
 
     "gel", "git",
-    "bekle", "dur"
+    "bekle", "dur",
+
+    "sabah",
+    "gece",
+    "gün"
 }
 
 
@@ -252,6 +292,10 @@ def detect_language(text):
 
     if not word_list:
         return None
+
+    # -----------------------------------------------------
+    # Very short English words
+    # -----------------------------------------------------
 
     SHORT_ENGLISH = {
         "test",
@@ -289,17 +333,26 @@ def detect_language(text):
         print("Known short English word -> en")
         return "en"
 
-    # Russian / Cyrillic
+    # -----------------------------------------------------
+    # Russian
+    # -----------------------------------------------------
+
     if re.search(r"[А-Яа-яЁё]", text):
         print("Cyrillic detected -> ru")
         return "ru"
 
+    # -----------------------------------------------------
     # Turkish special characters
+    # -----------------------------------------------------
+
     if re.search(r"[ğüşıöçĞÜŞİÖÇ]", text):
         print("Turkish characters detected -> tr")
         return "tr"
 
-    # Common words scoring
+    # -----------------------------------------------------
+    # Common word scoring
+    # -----------------------------------------------------
+
     en_score = sum(
         1 for word in word_list
         if word in ENGLISH_COMMON
@@ -347,7 +400,10 @@ def detect_language(text):
             )
             return best_lang
 
-    # langdetect fallback
+    # -----------------------------------------------------
+    # langdetect
+    # -----------------------------------------------------
+
     try:
 
         detected = detect(text)
@@ -367,7 +423,10 @@ def detect_language(text):
             repr(e)
         )
 
+    # -----------------------------------------------------
     # Latin fallback
+    # -----------------------------------------------------
+
     if re.search(r"[A-Za-z]", text):
 
         print(
@@ -380,74 +439,164 @@ def detect_language(text):
 
 
 # =========================================================
-# FREE TRANSLATION
+# TRANSLATION
 # =========================================================
 
-async def translate_async(text, source, target):
+def translate(text, source, target):
 
     print(
         f"Translating: {source} -> {target}"
     )
 
-    try:
+    # Never send empty text
+    if not text or not text.strip():
+        return None
 
-        async with Translator() as translator:
+    for server in TRANSLATION_SERVERS:
 
-            result = await translator.translate(
-                text,
-                src=source,
-                dest=target
-            )
+        url = f"{server}/translate"
 
-            translated = result.text
+        payload = {
+            "q": text,
+            "source": source,
+            "target": target,
+            "format": "text"
+        }
 
-            if translated:
-
-                translated = translated.strip()
-
-                print(
-                    f"Translation {source}->{target}:",
-                    repr(translated)
-                )
-
-                return translated
+        try:
 
             print(
-                f"No translation returned "
-                f"{source}->{target}"
+                f"Trying translation server: {server}"
             )
 
-    except Exception as e:
+            response = requests.post(
+                url,
+                json=payload,
+                headers={
+                    "Content-Type": "application/json"
+                },
+                timeout=20
+            )
 
-        print(
-            f"Translation error "
-            f"{source}->{target}:",
-            repr(e)
-        )
+            print(
+                f"Translation HTTP status "
+                f"{source}->{target}:",
+                response.status_code
+            )
+
+            # -------------------------------------------------
+            # HTTP error
+            # -------------------------------------------------
+
+            if response.status_code != 200:
+
+                print(
+                    f"Server failed: {server}"
+                )
+
+                print(
+                    "Server response:",
+                    response.text[:500]
+                )
+
+                continue
+
+            # -------------------------------------------------
+            # JSON
+            # -------------------------------------------------
+
+            try:
+
+                data = response.json()
+
+            except Exception as e:
+
+                print(
+                    "Invalid JSON from translation server:",
+                    repr(e)
+                )
+
+                continue
+
+            print(
+                "Translation server response:",
+                data
+            )
+
+            translated = data.get(
+                "translatedText"
+            )
+
+            if not translated:
+
+                print(
+                    "No translatedText returned."
+                )
+
+                continue
+
+            translated = str(
+                translated
+            ).strip()
+
+            # -------------------------------------------------
+            # IMPORTANT:
+            # Don't accept the original text as translation.
+            # This prevents the old problem:
+            #
+            # hello -> hello
+            # -------------------------------------------------
+
+            if translated.lower() == text.strip().lower():
+
+                print(
+                    "WARNING: Translation server returned "
+                    "the original text. Trying next server."
+                )
+
+                continue
+
+            print(
+                f"SUCCESS {source}->{target}:",
+                repr(translated)
+            )
+
+            return translated
+
+        except requests.exceptions.Timeout:
+
+            print(
+                f"Translation server timeout: {server}"
+            )
+
+            continue
+
+        except requests.exceptions.RequestException as e:
+
+            print(
+                f"Translation request error "
+                f"{server}:",
+                repr(e)
+            )
+
+            continue
+
+        except Exception as e:
+
+            print(
+                f"Unexpected translation error "
+                f"{server}:",
+                repr(e)
+            )
+
+            continue
+
+    print(
+        f"ALL TRANSLATION SERVERS FAILED "
+        f"{source}->{target}"
+    )
 
     return None
-
-
-def translate(text, source, target):
-
-    try:
-
-        return asyncio.run(
-            translate_async(
-                text,
-                source,
-                target
-            )
-        )
-
-    except Exception as e:
-
-        print(
-            "async translation error:",
-            repr(e)
-        )
-
-        return None
 
 
 # =========================================================
@@ -564,7 +713,9 @@ def process_text(text, chat_id, message_id):
     if not translations:
         return
 
-    reply = "\n".join(translations)
+    reply = "\n".join(
+        translations
+    )
 
     print(
         "Final reply:",
@@ -589,7 +740,9 @@ def webhook():
 
     try:
 
-        data = request.get_json(force=True)
+        data = request.get_json(
+            force=True
+        )
 
     except Exception as e:
 
@@ -600,12 +753,23 @@ def webhook():
 
         return "ok", 200
 
+    # -----------------------------------------------------
     # Normal message
-    message = data.get("message")
+    # -----------------------------------------------------
 
+    message = data.get(
+        "message"
+    )
+
+    # -----------------------------------------------------
     # Edited message
+    # -----------------------------------------------------
+
     if not message:
-        message = data.get("edited_message")
+
+        message = data.get(
+            "edited_message"
+        )
 
     if not message:
         return "ok", 200
@@ -615,7 +779,9 @@ def webhook():
         {}
     )
 
-    chat_id = chat.get("id")
+    chat_id = chat.get(
+        "id"
+    )
 
     message_id = message.get(
         "message_id"
@@ -624,8 +790,13 @@ def webhook():
     if not chat_id:
         return "ok", 200
 
+    # -----------------------------------------------------
     # Normal text
-    text = message.get("text")
+    # -----------------------------------------------------
+
+    text = message.get(
+        "text"
+    )
 
     if text:
 
@@ -637,10 +808,18 @@ def webhook():
 
         return "ok", 200
 
+    # -----------------------------------------------------
     # Caption
-    caption = message.get("caption")
+    # -----------------------------------------------------
 
+    caption = message.get(
+        "caption"
+    )
+
+    # -----------------------------------------------------
     # Photo + caption
+    # -----------------------------------------------------
+
     if message.get("photo") and caption:
 
         print(
@@ -655,7 +834,10 @@ def webhook():
 
         return "ok", 200
 
+    # -----------------------------------------------------
     # Video + caption
+    # -----------------------------------------------------
+
     if message.get("video") and caption:
 
         print(
@@ -670,7 +852,10 @@ def webhook():
 
         return "ok", 200
 
+    # -----------------------------------------------------
     # Document + caption
+    # -----------------------------------------------------
+
     if message.get("document") and caption:
 
         print(
