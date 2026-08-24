@@ -1,4 +1,6 @@
 Flask
+gunicorn
 requests
 langdetect
-gunicorn
+argostranslate
+sentencepiece>=0.2.1
