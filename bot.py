@@ -1,12 +1,16 @@
 import os
 import re
+import time
 import requests
 
 from flask import Flask, request
 from langdetect import detect, LangDetectException
+from deep_translator import GoogleTranslator
 
-import argostranslate.translate
 
+# =========================================================
+# APP
+# =========================================================
 
 app = Flask(__name__)
 
@@ -40,7 +44,13 @@ LANGUAGE_ORDER = ["en", "ru", "tr"]
 session = requests.Session()
 
 session.headers.update({
-    "User-Agent": "Mozilla/5.0"
+    "User-Agent": (
+        "Mozilla/5.0 "
+        "(Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 "
+        "(KHTML, like Gecko) "
+        "Chrome/139.0 Safari/537.36"
+    )
 })
 
 
@@ -50,9 +60,10 @@ session.headers.update({
 
 ENGLISH_COMMON = {
     "a", "an", "the",
-    "i", "me", "my", "you", "your",
-    "he", "she", "it", "we", "us",
-    "they", "them",
+    "i", "me", "my",
+    "you", "your",
+    "he", "she", "it",
+    "we", "us", "they", "them",
 
     "is", "am", "are",
     "was", "were",
@@ -61,19 +72,18 @@ ENGLISH_COMMON = {
     "do", "does", "did",
     "have", "has", "had",
 
-    "can", "could",
-    "will", "would",
-    "should", "shall",
-    "may", "might", "must",
+    "can", "could", "will",
+    "would", "should",
+    "shall", "may",
+    "might", "must",
 
     "and", "or", "but",
     "if", "then",
     "because", "so",
-
-    "for", "from", "with",
-    "without", "about",
-    "to", "of", "in",
-    "on", "at", "by",
+    "for", "from",
+    "with", "without",
+    "about", "to", "of",
+    "in", "on", "at", "by",
 
     "what", "why", "who",
     "where", "when", "how",
@@ -99,13 +109,12 @@ ENGLISH_COMMON = {
     "sorry",
 
     "still", "some",
-    "any", "more", "less",
-    "very", "really",
-    "just", "only",
-    "also", "again",
-    "already",
+    "any", "more",
+    "less", "very",
+    "really", "just",
+    "only", "also",
+    "again", "already",
 
-    "mistake", "mistakes",
     "problem", "problems",
     "thing", "things",
 
@@ -117,10 +126,8 @@ ENGLISH_COMMON = {
     "go", "wait",
     "stop", "start",
 
-    "test",
-    "testing",
-    "welcome",
-    "help",
+    "test", "testing",
+    "welcome", "help",
     "done",
 
     "morning",
@@ -175,10 +182,9 @@ RUSSIAN_COMMON = {
     "здесь", "там",
     "сейчас",
     "сегодня", "завтра",
-    "вчера",
-
-    "снова", "опять",
-    "всегда", "никогда",
+    "вчера", "снова",
+    "опять", "всегда",
+    "никогда",
 
     "хорошо", "плохо",
     "спасибо", "пожалуйста",
@@ -224,7 +230,6 @@ TURKISH_COMMON = {
     "burada", "orada",
     "şimdi", "bugün",
     "yarın", "dün",
-
     "yine", "asla",
 
     "iyi", "kötü",
@@ -272,7 +277,7 @@ def detect_language(text):
     if not word_list:
         return None
 
-    short_english = {
+    SHORT_ENGLISH = {
         "test",
         "testing",
         "hello",
@@ -304,11 +309,11 @@ def detect_language(text):
         "welcome"
     }
 
-    if text in short_english:
+    if text in SHORT_ENGLISH:
         print("Known short English word -> en")
         return "en"
 
-    # Russian / Cyrillic
+    # Cyrillic = Russian
     if re.search(r"[А-Яа-яЁё]", text):
         print("Cyrillic detected -> ru")
         return "ru"
@@ -346,11 +351,7 @@ def detect_language(text):
         "tr": tr_score
     }
 
-    best_lang = max(
-        scores,
-        key=scores.get
-    )
-
+    best_lang = max(scores, key=scores.get)
     best_score = scores[best_lang]
 
     sorted_scores = sorted(
@@ -367,7 +368,6 @@ def detect_language(text):
             print(
                 f"Common words detected -> {best_lang}"
             )
-
             return best_lang
 
     try:
@@ -389,7 +389,7 @@ def detect_language(text):
             repr(e)
         )
 
-    # Latin text fallback
+    # Latin fallback
     if re.search(r"[A-Za-z]", text):
 
         print(
@@ -402,50 +402,83 @@ def detect_language(text):
 
 
 # =========================================================
-# ARGOS TRANSLATION
+# DEEP-TRANSLATOR
 # =========================================================
 
-def translate_argos(text, source, target):
+def translate_deep(text, source, target):
 
     print(
-        f"Argos translation: "
+        f"deep-translator: "
         f"{source} -> {target}"
     )
 
     try:
 
-        translated = (
-            argostranslate.translate.translate(
-                text,
-                source,
-                target
-            )
+        translator = GoogleTranslator(
+            source=source,
+            target=target
         )
 
-        if translated:
+        result = translator.translate(text)
 
-            translated = translated.strip()
+        if result:
+
+            result = result.strip()
 
             print(
-                f"Argos result "
+                f"Translation result "
                 f"{source}->{target}:",
-                repr(translated)
+                repr(result)
             )
 
-            return translated
+            return result
 
         print(
-            f"Argos returned empty result "
+            f"Empty translation "
             f"{source}->{target}"
         )
 
     except Exception as e:
 
         print(
-            f"Argos translation error "
+            f"deep-translator error "
             f"{source}->{target}:",
             repr(e)
         )
+
+    return None
+
+
+# =========================================================
+# TRANSLATION WITH RETRY
+# =========================================================
+
+def translate(text, source, target):
+
+    result = translate_deep(
+        text,
+        source,
+        target
+    )
+
+    if result:
+        return result
+
+    print(
+        f"Retrying translation "
+        f"{source}->{target}"
+    )
+
+    time.sleep(1)
+
+    result = translate_deep(
+        text,
+        source,
+        target
+    )
+
+    if result:
+        return result
 
     return None
 
@@ -536,6 +569,12 @@ def process_text(
             source_lang
         )
 
+        send_message(
+            chat_id,
+            "❌ I can only translate English, Russian and Turkish.",
+            message_id
+        )
+
         return
 
     target_languages = [
@@ -553,7 +592,7 @@ def process_text(
 
     for target in target_languages:
 
-        translated = translate_argos(
+        translated = translate(
             text,
             source_lang,
             target
@@ -616,7 +655,12 @@ def webhook():
 
         return "ok", 200
 
-    message = data.get("message")
+    if not data:
+        return "ok", 200
+
+    message = data.get(
+        "message"
+    )
 
     if not message:
 
@@ -632,7 +676,9 @@ def webhook():
         {}
     )
 
-    chat_id = chat.get("id")
+    chat_id = chat.get(
+        "id"
+    )
 
     message_id = message.get(
         "message_id"
@@ -641,8 +687,13 @@ def webhook():
     if not chat_id:
         return "ok", 200
 
+    # -------------------------
     # Normal text
-    text = message.get("text")
+    # -------------------------
+
+    text = message.get(
+        "text"
+    )
 
     if text:
 
@@ -654,14 +705,23 @@ def webhook():
 
         return "ok", 200
 
+    # -------------------------
     # Caption
-    caption = message.get("caption")
+    # -------------------------
+
+    caption = message.get(
+        "caption"
+    )
 
     if not caption:
         return "ok", 200
 
     # Photo
     if message.get("photo"):
+
+        print(
+            "Photo caption detected."
+        )
 
         process_text(
             caption,
@@ -674,6 +734,10 @@ def webhook():
     # Video
     if message.get("video"):
 
+        print(
+            "Video caption detected."
+        )
+
         process_text(
             caption,
             chat_id,
@@ -684,6 +748,10 @@ def webhook():
 
     # Document
     if message.get("document"):
+
+        print(
+            "Document caption detected."
+        )
 
         process_text(
             caption,
