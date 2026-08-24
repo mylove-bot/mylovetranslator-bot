@@ -2,209 +2,198 @@ import os
 import re
 import time
 import logging
-from flask import Flask, request, jsonify
-import requests
 
+import requests
+from flask import Flask, request
 from deep_translator import GoogleTranslator
 
 
-# ============================================================
-# SETTINGS
-# ============================================================
+# =========================================================
+# CONFIG
+# =========================================================
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
+TOKEN = os.getenv("TOKEN")
 
-if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN environment variable is missing.")
+if not TOKEN:
+    raise RuntimeError("TOKEN environment variable is missing.")
 
-TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
+PORT = int(os.getenv("PORT", "10000"))
 
-app = Flask(__name__)
+TELEGRAM_API = f"https://api.telegram.org/bot{TOKEN}"
+
+# =========================================================
+# LOGGING
+# =========================================================
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
+    format="%(asctime)s | %(levelname)s | %(message)s"
 )
 
+# =========================================================
+# FLASK
+# =========================================================
 
-# ============================================================
+app = Flask(__name__)
+
+
+# =========================================================
 # LANGUAGES
-# ============================================================
+# =========================================================
 
-LANG_NAMES = {
-    "en": "English",
-    "ru": "Russian",
-    "tr": "Turkish",
+LANGUAGES = {
+    "en": {
+        "flag": "🇬🇧",
+        "name": "English"
+    },
+    "ru": {
+        "flag": "🇷🇺",
+        "name": "Russian"
+    },
+    "tr": {
+        "flag": "🇹🇷",
+        "name": "Turkish"
+    }
 }
 
-FLAGS = {
-    "en": "🇬🇧",
-    "ru": "🇷🇺",
-    "tr": "🇹🇷",
-}
 
-
-# ============================================================
-# SIMPLE LANGUAGE DETECTION
-# ============================================================
+# =========================================================
+# LANGUAGE DETECTION
+# =========================================================
 
 ENGLISH_WORDS = {
-    "the", "a", "an", "and", "or", "but",
-    "is", "are", "was", "were",
-    "i", "you", "he", "she", "it", "we", "they",
-    "me", "my", "your", "his", "her", "our", "their",
-    "this", "that", "these", "those",
-    "what", "why", "when", "where", "who", "how",
-    "hello", "hi", "hey",
-    "yes", "no", "not",
-    "please", "thanks", "thank",
-    "good", "bad", "great",
-    "need", "want", "like", "love",
-    "money", "buy", "work", "group",
-    "translate", "translation", "translator",
-    "delete", "bot",
-    "will", "can", "cannot",
-    "think", "know", "have", "has",
-    "do", "does", "did",
-    "in", "on", "at", "to", "from", "for", "with",
-    "of", "about", "because", "if",
+    "the", "and", "you", "your", "are", "is", "am",
+    "i", "me", "my", "we", "they", "this", "that",
+    "what", "why", "how", "where", "when", "who",
+    "hello", "hi", "yes", "no", "not", "have",
+    "has", "do", "does", "did", "will", "can",
+    "just", "with", "for", "from", "but", "because",
+    "please", "thanks", "thank", "game", "money",
+    "need", "want", "think", "good", "bad",
+    "love", "like", "hate", "sorry", "okay", "ok",
+    "maybe", "really", "very", "now", "today",
+    "tomorrow", "come", "go", "going", "get",
+    "got", "make", "made", "know", "don't",
+    "doesn't", "can't", "won't"
 }
 
 TURKISH_WORDS = {
-    "bir", "ve", "veya", "ama",
-    "ben", "sen", "o", "biz", "siz", "onlar",
-    "bu", "şu", "ne", "neden", "nasıl",
-    "merhaba", "selam",
-    "evet", "hayır",
-    "çok", "iyi", "kötü",
-    "para", "var", "yok",
-    "istiyorum", "istemiyorum",
-    "biliyorum", "bilmiyorum",
-    "değil", "için", "ile",
-    "olan", "gibi",
-    "çeviri", "çevirmen",
+    "bir", "ve", "bu", "şu", "ben", "sen", "biz",
+    "siz", "onlar", "için", "ile", "de", "da",
+    "ne", "neden", "nasıl", "nerede", "kim",
+    "evet", "hayır", "değil", "çok", "var", "yok",
+    "ama", "çünkü", "teşekkür", "merhaba", "selam",
+    "benim", "senin", "oyun", "para", "istiyorum",
+    "gerekiyor", "bunu", "bana", "sana", "şimdi",
+    "bugün", "yarın", "gel", "git", "neden",
+    "tamam", "iyi", "kötü", "aşk", "seviyorum"
 }
 
-RUSSIAN_WORDS = {
-    "и", "или", "но",
-    "я", "ты", "он", "она", "мы", "вы", "они",
-    "это", "этот", "эта", "эти",
-    "что", "почему", "как", "где", "когда",
-    "да", "нет",
-    "привет", "здравствуйте",
-    "очень", "хорошо", "плохо",
-    "деньги", "есть", "нет",
-    "хочу", "хочешь",
-    "нужно", "нужен",
-    "знаю", "не знаю",
-    "перевод", "переводчик",
-    "группа",
-}
-
-
-def contains_cyrillic(text):
-    return bool(re.search(r"[А-Яа-яЁё]", text))
-
-
-def contains_turkish_chars(text):
-    return bool(re.search(r"[çğıöşüÇĞİÖŞÜ]", text))
-
-
-def contains_latin(text):
-    return bool(re.search(r"[A-Za-z]", text))
+CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
 
 
 def detect_language(text):
     """
-    Detect only the three languages supported by the bot:
-    English / Russian / Turkish.
+    Detect English / Russian / Turkish.
     """
 
-    clean = text.lower().strip()
-
-    if not clean:
+    if not text or not text.strip():
         return None
 
-    # --------------------------------------------------------
-    # Cyrillic = Russian
-    # --------------------------------------------------------
+    # Remove URLs
+    clean = re.sub(r"https?://\S+", " ", text)
 
-    if contains_cyrillic(clean):
+    # Cyrillic = Russian
+    cyrillic_count = len(CYRILLIC_RE.findall(clean))
+
+    if cyrillic_count > 0:
         logging.info("Cyrillic detected -> ru")
         return "ru"
 
-    # --------------------------------------------------------
-    # Turkish-specific letters
-    # --------------------------------------------------------
+    words = re.findall(
+        r"[A-Za-zÇĞİÖŞÜçğıöşüА-Яа-яЁё']+",
+        clean
+    )
 
-    if contains_turkish_chars(clean):
-        logging.info("Turkish characters detected -> tr")
-        return "tr"
+    if not words:
+        return None
 
-    # --------------------------------------------------------
-    # Word scoring
-    # --------------------------------------------------------
+    lowered = [word.lower() for word in words]
 
-    words = re.findall(r"[a-zA-ZçğıöşüÇĞİÖŞÜ]+", clean)
+    en_score = sum(
+        1 for word in lowered
+        if word in ENGLISH_WORDS
+    )
 
-    en_score = 0
-    tr_score = 0
-    ru_score = 0
+    tr_score = sum(
+        1 for word in lowered
+        if word in TURKISH_WORDS
+    )
 
-    for word in words:
-        if word in ENGLISH_WORDS:
-            en_score += 1
-
-        if word in TURKISH_WORDS:
-            tr_score += 1
-
-        if word in RUSSIAN_WORDS:
-            ru_score += 1
+    # Turkish special letters
+    if any(
+        char in text
+        for char in "çğıöşüÇĞİÖŞÜ"
+    ):
+        tr_score += 2
 
     logging.info(
-        "Language scores: en=%s ru=%s tr=%s",
+        "Language scores: en=%s, tr=%s",
         en_score,
-        ru_score,
         tr_score
     )
 
-    highest = max(en_score, ru_score, tr_score)
+    if en_score > tr_score and en_score > 0:
+        logging.info("English detected -> en")
+        return "en"
 
-    if highest > 0:
-        if en_score == highest:
-            logging.info("Common words detected -> en")
-            return "en"
+    if tr_score > en_score and tr_score > 0:
+        logging.info("Turkish detected -> tr")
+        return "tr"
 
-        if ru_score == highest:
-            logging.info("Common words detected -> ru")
-            return "ru"
-
-        if tr_score == highest:
-            logging.info("Common words detected -> tr")
-            return "tr"
-
-    # --------------------------------------------------------
     # Latin fallback
-    #
-    # If the message is written using Latin letters but
-    # detection is uncertain, English is the safest fallback
-    # for this bot.
-    # --------------------------------------------------------
+    latin_count = sum(
+        1 for char in clean
+        if (
+            ("a" <= char.lower() <= "z")
+            or char in "çğıöşüÇĞİÖŞÜ"
+        )
+    )
 
-    if contains_latin(clean):
+    if latin_count >= 2:
         logging.info("Latin fallback -> en")
         return "en"
 
     return None
 
 
-# ============================================================
-# TRANSLATION
-# ============================================================
+# =========================================================
+# TARGET LANGUAGES
+# =========================================================
 
-def translate_once(text, source, target):
+def get_target_languages(source):
+    if source == "en":
+        return ["ru", "tr"]
+
+    if source == "ru":
+        return ["en", "tr"]
+
+    if source == "tr":
+        return ["en", "ru"]
+
+    return []
+
+
+# =========================================================
+# TRANSLATION
+# =========================================================
+
+def translate_text(text, source, target):
     """
-    One translation attempt.
+    Translate using deep-translator.
+
+    We create a fresh translator for every request.
+    This avoids keeping unnecessary state in memory.
     """
 
     logging.info(
@@ -213,46 +202,15 @@ def translate_once(text, source, target):
         target
     )
 
-    translator = GoogleTranslator(
-        source=source,
-        target=target
-    )
+    try:
+        translator = GoogleTranslator(
+            source=source,
+            target=target
+        )
 
-    result = translator.translate(text)
+        result = translator.translate(text)
 
-    if result is None:
-        raise RuntimeError("Translator returned None")
-
-    result = str(result).strip()
-
-    if not result:
-        raise RuntimeError("Translator returned empty result")
-
-    return result
-
-
-def translate_text(text, source, target):
-    """
-    Retry translation several times.
-    """
-
-    # Don't translate to the same language.
-    if source == target:
-        return text
-
-    last_error = None
-
-    # Three attempts with small delays.
-    for attempt in range(1, 4):
-
-        try:
-
-            result = translate_once(
-                text,
-                source,
-                target
-            )
-
+        if result:
             logging.info(
                 "Translation result %s->%s: %r",
                 source,
@@ -260,53 +218,83 @@ def translate_text(text, source, target):
                 result
             )
 
+            return result.strip()
+
+        logging.warning(
+            "Empty translation %s->%s",
+            source,
+            target
+        )
+
+        return None
+
+    except Exception as exc:
+        logging.warning(
+            "deep-translator error %s->%s: %s",
+            source,
+            target,
+            repr(exc)
+        )
+
+        return None
+
+
+def translate_with_retry(text, source, target, retries=2):
+    """
+    Try translation more than once.
+    """
+
+    for attempt in range(retries + 1):
+
+        result = translate_text(
+            text,
+            source,
+            target
+        )
+
+        if result:
             return result
 
-        except Exception as e:
-
-            last_error = e
-
-            logging.warning(
-                "Translation error %s->%s attempt %s/3: %r",
+        if attempt < retries:
+            logging.info(
+                "Retrying translation %s->%s (attempt %s/%s)",
                 source,
                 target,
-                attempt,
-                e
+                attempt + 1,
+                retries
             )
 
-            if attempt < 3:
-                time.sleep(1.5 * attempt)
-
-    logging.error(
-        "Translation failed permanently %s->%s: %r",
-        source,
-        target,
-        last_error
-    )
+            time.sleep(1.5)
 
     return None
 
 
-# ============================================================
-# TELEGRAM
-# ============================================================
+# =========================================================
+# TELEGRAM SEND
+# =========================================================
 
-def send_message(chat_id, text, reply_to=None):
-
-    data = {
+def send_message(
+    chat_id,
+    text,
+    reply_to_message_id=None
+):
+    payload = {
         "chat_id": chat_id,
         "text": text,
+        "disable_web_page_preview": True
     }
 
-    if reply_to:
-        data["reply_to_message_id"] = reply_to
+    if reply_to_message_id:
+        payload["reply_to_message_id"] = (
+            reply_to_message_id
+        )
 
     try:
 
         response = requests.post(
             f"{TELEGRAM_API}/sendMessage",
-            json=data,
-            timeout=20
+            json=payload,
+            timeout=15
         )
 
         logging.info(
@@ -316,55 +304,36 @@ def send_message(chat_id, text, reply_to=None):
 
         logging.info(
             "Telegram response: %s",
-            response.text
+            response.text[:1000]
         )
 
-        return response
+        return response.ok
 
-    except Exception as e:
+    except requests.RequestException as exc:
 
-        logging.exception(
-            "Telegram sendMessage error: %r",
-            e
+        logging.warning(
+            "Telegram error: %s",
+            exc
         )
 
+        return False
+
+
+# =========================================================
+# BUILD TRANSLATION REPLY
+# =========================================================
+
+def build_reply(text, source):
+
+    targets = get_target_languages(source)
+
+    if not targets:
         return None
-
-
-# ============================================================
-# TRANSLATION LOGIC
-# ============================================================
-
-def build_translation(text):
-
-    source = detect_language(text)
 
     logging.info(
         "Detected language: %s",
         source
     )
-
-    # Only these languages are supported.
-    if source not in LANG_NAMES:
-
-        logging.info(
-            "Unsupported language: %s",
-            source
-        )
-
-        return (
-            "❌ I can only translate English, Russian and Turkish."
-        )
-
-    # --------------------------------------------------------
-    # Target languages
-    # --------------------------------------------------------
-
-    targets = [
-        lang
-        for lang in LANG_NAMES
-        if lang != source
-    ]
 
     logging.info(
         "Target languages: %s",
@@ -375,36 +344,44 @@ def build_translation(text):
 
     for target in targets:
 
-        translated = translate_text(
+        translated = translate_with_retry(
             text,
             source,
-            target
+            target,
+            retries=2
         )
 
+        flag = LANGUAGES[target]["flag"]
+
         if translated:
-
             results.append(
-                f"{FLAGS[target]} {translated}"
+                f"{flag} {translated}"
             )
-
         else:
-
             results.append(
-                f"{FLAGS[target]} Translation failed."
+                f"{flag} Translation failed."
             )
 
     return "\n".join(results)
 
 
-# ============================================================
-# FLASK
-# ============================================================
+# =========================================================
+# HEALTH CHECK
+# =========================================================
 
-@app.route("/", methods=["GET", "HEAD"])
+@app.route("/", methods=["GET"])
 def home():
-
     return "Translator bot is running.", 200
 
+
+@app.route("/health", methods=["GET"])
+def health():
+    return "OK", 200
+
+
+# =========================================================
+# TELEGRAM WEBHOOK
+# =========================================================
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -416,97 +393,130 @@ def webhook():
         )
 
         if not update:
-            return jsonify({"ok": True}), 200
+            return "OK", 200
 
         message = update.get("message")
 
         if not message:
-            return jsonify({"ok": True}), 200
-
-        # ----------------------------------------------------
-        # Ignore bot messages
-        # ----------------------------------------------------
-
-        sender = message.get("from", {})
-
-        if sender.get("is_bot"):
-            return jsonify({"ok": True}), 200
-
-        # ----------------------------------------------------
-        # Text
-        # ----------------------------------------------------
+            return "OK", 200
 
         text = message.get("text")
 
+        # Ignore photos/stickers/voice/etc.
         if not text:
-            return jsonify({"ok": True}), 200
+            return "OK", 200
 
-        text = text.strip()
+        chat = message.get("chat", {})
+        chat_id = chat.get("id")
 
-        if not text:
-            return jsonify({"ok": True}), 200
+        message_id = message.get(
+            "message_id"
+        )
 
-        chat_id = message["chat"]["id"]
+        if not chat_id:
+            return "OK", 200
 
-        message_id = message.get("message_id")
+        logging.info("=" * 50)
 
-        logging.info("=" * 60)
         logging.info(
             "Incoming text: %r",
             text
         )
 
-        # ----------------------------------------------------
-        # Translate
-        # ----------------------------------------------------
+        # -------------------------------------------------
+        # Ignore commands
+        # -------------------------------------------------
 
-        reply = build_translation(text)
+        if text.startswith("/"):
+            logging.info(
+                "Command ignored: %s",
+                text
+            )
+
+            return "OK", 200
+
+        # -------------------------------------------------
+        # Detect language
+        # -------------------------------------------------
+
+        source = detect_language(text)
+
+        logging.info(
+            "Detected language: %s",
+            source
+        )
+
+        if source is None:
+
+            logging.info(
+                "Unsupported language: %s",
+                source
+            )
+
+            send_message(
+                chat_id,
+                "❌ I can only translate English, Russian and Turkish.",
+                message_id
+            )
+
+            return "OK", 200
+
+        # -------------------------------------------------
+        # Translate
+        # -------------------------------------------------
+
+        reply = build_reply(
+            text,
+            source
+        )
+
+        if not reply:
+            return "OK", 200
 
         logging.info(
             "Final reply: %r",
             reply
         )
 
-        # ----------------------------------------------------
+        # -------------------------------------------------
         # Send
-        # ----------------------------------------------------
+        # -------------------------------------------------
 
         send_message(
-            chat_id=chat_id,
-            text=reply,
-            reply_to=message_id
+            chat_id,
+            reply,
+            message_id
         )
 
-        logging.info("=" * 60)
+        logging.info("=" * 50)
 
-        return jsonify({"ok": True}), 200
+        return "OK", 200
 
-    except Exception as e:
+    except Exception as exc:
 
         logging.exception(
-            "Webhook error: %r",
-            e
+            "Webhook error: %s",
+            exc
         )
 
-        # Always return 200 to Telegram so it doesn't
-        # repeatedly resend the same update.
-        return jsonify({"ok": True}), 200
+        # Always return 200 to Telegram
+        # to prevent repeated webhook delivery.
+        return "OK", 200
 
 
-# ============================================================
-# START SERVER
-# ============================================================
+# =========================================================
+# START
+# =========================================================
 
 if __name__ == "__main__":
 
-    port = int(
-        os.environ.get(
-            "PORT",
-            "10000"
-        )
-    )
+    logging.info("=" * 50)
+    logging.info("Translator bot starting...")
+    logging.info("TOKEN detected.")
+    logging.info("Port: %s", PORT)
+    logging.info("=" * 50)
 
     app.run(
         host="0.0.0.0",
-        port=port
+        port=PORT
 )
