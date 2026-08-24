@@ -1,5 +1,5 @@
-Flask==3.1.2
-requests==2.32.5
-langdetect==1.0.9
-argostranslate==1.10.0
-gunicorn==26.1.0
+Flask
+requests
+langdetect
+deep-translator
+gunicorn
