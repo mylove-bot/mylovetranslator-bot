@@ -1,4 +1,5 @@
-gunicorn
+Flask
 requests
 langdetect
-flask
+gunicorn
+googletrans==4.0.2
