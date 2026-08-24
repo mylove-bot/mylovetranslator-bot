@@ -1,9 +1,11 @@
 import os
 import re
+import asyncio
 import requests
 
 from flask import Flask, request
 from langdetect import detect, LangDetectException
+from googletrans import Translator
 
 
 app = Flask(__name__)
@@ -19,6 +21,7 @@ if not TOKEN:
     raise RuntimeError("TOKEN environment variable is missing")
 
 TELEGRAM_URL = f"https://api.telegram.org/bot{TOKEN}"
+
 
 SUPPORTED_LANGS = {"en", "ru", "tr"}
 
@@ -49,10 +52,10 @@ ENGLISH_COMMON = {
     "do", "does", "did",
     "have", "has", "had",
 
-    "can", "could",
-    "will", "would",
-    "should", "shall",
-    "may", "might", "must",
+    "can", "could", "will",
+    "would", "should",
+    "shall", "may",
+    "might", "must",
 
     "and", "or", "but",
     "if", "then",
@@ -250,10 +253,6 @@ def detect_language(text):
     if not word_list:
         return None
 
-    # -----------------------------------------------------
-    # Very short English words
-    # -----------------------------------------------------
-
     SHORT_ENGLISH = {
         "test",
         "testing",
@@ -290,26 +289,17 @@ def detect_language(text):
         print("Known short English word -> en")
         return "en"
 
-    # -----------------------------------------------------
-    # Russian
-    # -----------------------------------------------------
-
+    # Russian / Cyrillic
     if re.search(r"[А-Яа-яЁё]", text):
         print("Cyrillic detected -> ru")
         return "ru"
 
-    # -----------------------------------------------------
     # Turkish special characters
-    # -----------------------------------------------------
-
     if re.search(r"[ğüşıöçĞÜŞİÖÇ]", text):
         print("Turkish characters detected -> tr")
         return "tr"
 
-    # -----------------------------------------------------
-    # Common word scoring
-    # -----------------------------------------------------
-
+    # Common words scoring
     en_score = sum(
         1 for word in word_list
         if word in ENGLISH_COMMON
@@ -357,10 +347,7 @@ def detect_language(text):
             )
             return best_lang
 
-    # -----------------------------------------------------
-    # langdetect
-    # -----------------------------------------------------
-
+    # langdetect fallback
     try:
 
         detected = detect(text)
@@ -380,10 +367,7 @@ def detect_language(text):
             repr(e)
         )
 
-    # -----------------------------------------------------
     # Latin fallback
-    # -----------------------------------------------------
-
     if re.search(r"[A-Za-z]", text):
 
         print(
@@ -396,10 +380,10 @@ def detect_language(text):
 
 
 # =========================================================
-# TRANSLATION
+# FREE TRANSLATION
 # =========================================================
 
-def translate(text, source, target):
+async def translate_async(text, source, target):
 
     print(
         f"Translating: {source} -> {target}"
@@ -407,58 +391,31 @@ def translate(text, source, target):
 
     try:
 
-        url = "https://api.mymemory.translated.net/get"
+        async with Translator() as translator:
 
-        params = {
-            "q": text,
-            "langpair": f"{source}|{target}"
-        }
-
-        response = requests.get(
-            url,
-            params=params,
-            timeout=20
-        )
-
-        print(
-            f"Translation HTTP status "
-            f"{source}->{target}:",
-            response.status_code
-        )
-
-        if response.status_code != 200:
-            print(
-                "Translation API HTTP error:",
-                response.text
-            )
-            return None
-
-        data = response.json()
-
-        response_data = data.get(
-            "responseData",
-            {}
-        )
-
-        translated = response_data.get(
-            "translatedText"
-        )
-
-        if translated:
-
-            translated = translated.strip()
-
-            print(
-                f"Translation {source}->{target}:",
-                repr(translated)
+            result = await translator.translate(
+                text,
+                src=source,
+                dest=target
             )
 
-            return translated
+            translated = result.text
 
-        print(
-            "Translation API returned no translation:",
-            data
-        )
+            if translated:
+
+                translated = translated.strip()
+
+                print(
+                    f"Translation {source}->{target}:",
+                    repr(translated)
+                )
+
+                return translated
+
+            print(
+                f"No translation returned "
+                f"{source}->{target}"
+            )
 
     except Exception as e:
 
@@ -469,6 +426,28 @@ def translate(text, source, target):
         )
 
     return None
+
+
+def translate(text, source, target):
+
+    try:
+
+        return asyncio.run(
+            translate_async(
+                text,
+                source,
+                target
+            )
+        )
+
+    except Exception as e:
+
+        print(
+            "async translation error:",
+            repr(e)
+        )
+
+        return None
 
 
 # =========================================================
@@ -621,16 +600,10 @@ def webhook():
 
         return "ok", 200
 
-    # -----------------------------------------------------
     # Normal message
-    # -----------------------------------------------------
-
     message = data.get("message")
 
-    # -----------------------------------------------------
     # Edited message
-    # -----------------------------------------------------
-
     if not message:
         message = data.get("edited_message")
 
@@ -651,10 +624,7 @@ def webhook():
     if not chat_id:
         return "ok", 200
 
-    # -----------------------------------------------------
     # Normal text
-    # -----------------------------------------------------
-
     text = message.get("text")
 
     if text:
@@ -667,16 +637,10 @@ def webhook():
 
         return "ok", 200
 
-    # -----------------------------------------------------
     # Caption
-    # -----------------------------------------------------
-
     caption = message.get("caption")
 
-    # -----------------------------------------------------
     # Photo + caption
-    # -----------------------------------------------------
-
     if message.get("photo") and caption:
 
         print(
@@ -691,10 +655,7 @@ def webhook():
 
         return "ok", 200
 
-    # -----------------------------------------------------
     # Video + caption
-    # -----------------------------------------------------
-
     if message.get("video") and caption:
 
         print(
@@ -709,10 +670,7 @@ def webhook():
 
         return "ok", 200
 
-    # -----------------------------------------------------
     # Document + caption
-    # -----------------------------------------------------
-
     if message.get("document") and caption:
 
         print(
