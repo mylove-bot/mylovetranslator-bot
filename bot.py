@@ -1,11 +1,11 @@
 import os
 import re
-
 import requests
-import argostranslate.translate
 
 from flask import Flask, request
 from langdetect import detect, LangDetectException
+
+import argostranslate.translate
 
 
 app = Flask(__name__)
@@ -18,22 +18,11 @@ app = Flask(__name__)
 TOKEN = os.getenv("TOKEN")
 
 if not TOKEN:
-    raise RuntimeError(
-        "TOKEN environment variable is missing"
-    )
+    raise RuntimeError("TOKEN environment variable is missing")
 
+TELEGRAM_URL = f"https://api.telegram.org/bot{TOKEN}"
 
-TELEGRAM_URL = (
-    f"https://api.telegram.org/bot{TOKEN}"
-)
-
-
-SUPPORTED_LANGS = {
-    "en",
-    "ru",
-    "tr"
-}
-
+SUPPORTED_LANGS = {"en", "ru", "tr"}
 
 FLAGS = {
     "en": "🇬🇧",
@@ -41,12 +30,7 @@ FLAGS = {
     "tr": "🇹🇷"
 }
 
-
-LANGUAGE_ORDER = [
-    "en",
-    "ru",
-    "tr"
-]
+LANGUAGE_ORDER = ["en", "ru", "tr"]
 
 
 # =========================================================
@@ -56,7 +40,7 @@ LANGUAGE_ORDER = [
 session = requests.Session()
 
 session.headers.update({
-    "User-Agent": "TelegramTranslatorBot/1.0"
+    "User-Agent": "Mozilla/5.0"
 })
 
 
@@ -66,10 +50,9 @@ session.headers.update({
 
 ENGLISH_COMMON = {
     "a", "an", "the",
-    "i", "me", "my",
-    "you", "your",
-    "he", "she", "it",
-    "we", "us", "they", "them",
+    "i", "me", "my", "you", "your",
+    "he", "she", "it", "we", "us",
+    "they", "them",
 
     "is", "am", "are",
     "was", "were",
@@ -86,6 +69,7 @@ ENGLISH_COMMON = {
     "and", "or", "but",
     "if", "then",
     "because", "so",
+
     "for", "from", "with",
     "without", "about",
     "to", "of", "in",
@@ -192,6 +176,7 @@ RUSSIAN_COMMON = {
     "сейчас",
     "сегодня", "завтра",
     "вчера",
+
     "снова", "опять",
     "всегда", "никогда",
 
@@ -239,6 +224,7 @@ TURKISH_COMMON = {
     "burada", "orada",
     "şimdi", "bugün",
     "yarın", "dün",
+
     "yine", "asla",
 
     "iyi", "kötü",
@@ -281,7 +267,6 @@ def words(text):
 def detect_language(text):
 
     text = normalize(text)
-
     word_list = words(text)
 
     if not word_list:
@@ -323,37 +308,28 @@ def detect_language(text):
         print("Known short English word -> en")
         return "en"
 
-    # Russian
-    if re.search(
-        r"[А-Яа-яЁё]",
-        text
-    ):
+    # Russian / Cyrillic
+    if re.search(r"[А-Яа-яЁё]", text):
         print("Cyrillic detected -> ru")
         return "ru"
 
-    # Turkish-specific characters
-    if re.search(
-        r"[ğüşıöçĞÜŞİÖÇ]",
-        text
-    ):
+    # Turkish-specific letters
+    if re.search(r"[ğüşıöçĞÜŞİÖÇ]", text):
         print("Turkish characters detected -> tr")
         return "tr"
 
     en_score = sum(
-        1
-        for word in word_list
+        1 for word in word_list
         if word in ENGLISH_COMMON
     )
 
     ru_score = sum(
-        1
-        for word in word_list
+        1 for word in word_list
         if word in RUSSIAN_COMMON
     )
 
     tr_score = sum(
-        1
-        for word in word_list
+        1 for word in word_list
         if word in TURKISH_COMMON
     )
 
@@ -389,8 +365,7 @@ def detect_language(text):
             or sorted_scores[0] > sorted_scores[1]
         ):
             print(
-                f"Common words detected -> "
-                f"{best_lang}"
+                f"Common words detected -> {best_lang}"
             )
 
             return best_lang
@@ -415,10 +390,7 @@ def detect_language(text):
         )
 
     # Latin text fallback
-    if re.search(
-        r"[A-Za-z]",
-        text
-    ):
+    if re.search(r"[A-Za-z]", text):
 
         print(
             "Latin fallback -> en"
@@ -433,11 +405,7 @@ def detect_language(text):
 # ARGOS TRANSLATION
 # =========================================================
 
-def translate_local(
-    text,
-    source,
-    target
-):
+def translate_argos(text, source, target):
 
     print(
         f"Argos translation: "
@@ -585,7 +553,7 @@ def process_text(
 
     for target in target_languages:
 
-        translated = translate_local(
+        translated = translate_argos(
             text,
             source_lang,
             target
@@ -600,8 +568,7 @@ def process_text(
         else:
 
             translations.append(
-                f"{FLAGS[target]} "
-                f"Translation failed."
+                f"{FLAGS[target]} Translation failed."
             )
 
     reply = "\n".join(
@@ -649,12 +616,7 @@ def webhook():
 
         return "ok", 200
 
-    if not data:
-        return "ok", 200
-
-    message = data.get(
-        "message"
-    )
+    message = data.get("message")
 
     if not message:
 
@@ -670,9 +632,7 @@ def webhook():
         {}
     )
 
-    chat_id = chat.get(
-        "id"
-    )
+    chat_id = chat.get("id")
 
     message_id = message.get(
         "message_id"
@@ -682,9 +642,7 @@ def webhook():
         return "ok", 200
 
     # Normal text
-    text = message.get(
-        "text"
-    )
+    text = message.get("text")
 
     if text:
 
@@ -697,19 +655,14 @@ def webhook():
         return "ok", 200
 
     # Caption
-    caption = message.get(
-        "caption"
-    )
+    caption = message.get("caption")
 
     if not caption:
         return "ok", 200
 
+    # Photo
     if message.get("photo"):
 
-        print(
-            "Photo caption detected."
-        )
-
         process_text(
             caption,
             chat_id,
@@ -718,12 +671,9 @@ def webhook():
 
         return "ok", 200
 
+    # Video
     if message.get("video"):
 
-        print(
-            "Video caption detected."
-        )
-
         process_text(
             caption,
             chat_id,
@@ -732,11 +682,8 @@ def webhook():
 
         return "ok", 200
 
+    # Document
     if message.get("document"):
-
-        print(
-            "Document caption detected."
-        )
 
         process_text(
             caption,
